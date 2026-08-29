@@ -1,0 +1,16 @@
+# psql -h localhost -p 5433 -U chatterbox -d chatterbox
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: chatterbox
+      POSTGRES_PASSWORD: supersecretpassword
+      POSTGRES_DB: chatterbox
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+volumes:
+  pgdata:
