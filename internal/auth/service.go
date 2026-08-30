@@ -5,10 +5,13 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"strings"
 )
 
-const refreshTokenBytes = 32
-const minPasswordLength = 8
+const (
+	refreshTokenBytes = 32
+	minPasswordLength = 8
+)
 
 type Service struct {
 	store  Store
@@ -20,6 +23,11 @@ func NewService(store Store, secret []byte) *Service {
 }
 
 func (s *Service) Register(ctx context.Context, req RegisterRequest) error {
+	email, err := normalizeEmail(req.Email)
+	if err != nil {
+		return err
+	}
+
 	if err := validatePasswordStrength(req.Password); err != nil {
 		return err
 	}
@@ -29,12 +37,17 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) error {
 		return err
 	}
 
-	_, err = s.store.CreateUser(ctx, req.Email, hash, req.Name)
+	_, err = s.store.CreateUser(ctx, email, hash, req.Name)
 	return err
 }
 
 func (s *Service) Login(ctx context.Context, req LoginRequest) (*TokenPair, error) {
-	user, err := s.store.GetUserByEmail(ctx, req.Email)
+	email, err := normalizeEmail(req.Email)
+	if err != nil {
+		return nil, ErrInvalidEmail
+	}
+
+	user, err := s.store.GetUserByEmail(ctx, email)
 	if err != nil {
 		return nil, err
 	}
@@ -60,6 +73,14 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*TokenPair, erro
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}, nil
+}
+
+func normalizeEmail(email string) (string, error) {
+	trimmed := strings.ToLower(strings.TrimSpace(email))
+	if trimmed == "" || !strings.Contains(trimmed, "@") || strings.ContainsAny(trimmed, " \t\n") {
+		return "", ErrInvalidEmail
+	}
+	return trimmed, nil
 }
 
 func validatePasswordStrength(password string) error {
