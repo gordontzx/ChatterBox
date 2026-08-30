@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -67,5 +68,37 @@ func TestLogin_UnknownEmail(t *testing.T) {
 	_, err := svc.Login(context.Background(), LoginRequest{Email: "nobody@b.com", Password: "whatever1"})
 	if !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials, got %v", err)
+	}
+}
+
+func TestRegister_NormalizesEmail(t *testing.T) {
+	store := newFakeStore()
+	svc := NewService(store, []byte("test-secret"))
+	ctx := context.Background()
+
+	svc.Register(ctx, RegisterRequest{Email: "  Alice@Example.com  ", Password: "password123", Name: "Alice"})
+	err := svc.Register(ctx, RegisterRequest{Email: "alice@example.com", Password: "password123", Name: "Alice"})
+
+	if !errors.Is(err, ErrEmailAlreadyRegistered) {
+		t.Fatalf("expected duplicate detection across case/whitespace variants, got %v", err)
+	}
+}
+
+func TestRegister_PasswordTooLong(t *testing.T) {
+	svc := NewService(newFakeStore(), []byte("test-secret"))
+	longPassword := strings.Repeat("a", 73)
+
+	err := svc.Register(context.Background(), RegisterRequest{Email: "a@b.com", Password: longPassword, Name: "A"})
+	if !errors.Is(err, ErrPasswordTooLong) {
+		t.Fatalf("expected ErrPasswordTooLong, got %v", err)
+	}
+}
+
+func TestRegister_InvalidEmail(t *testing.T) {
+	svc := NewService(newFakeStore(), []byte("test-secret"))
+
+	err := svc.Register(context.Background(), RegisterRequest{Email: "not-an-email", Password: "password123", Name: "A"})
+	if !errors.Is(err, ErrInvalidEmail) {
+		t.Fatalf("expected ErrInvalidEmail, got %v", err)
 	}
 }

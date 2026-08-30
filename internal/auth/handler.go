@@ -58,7 +58,7 @@ func writeAuthError(w http.ResponseWriter, err error) {
 		http.Error(w, err.Error(), http.StatusConflict) // 409
 	case errors.Is(err, ErrInvalidCredentials):
 		http.Error(w, err.Error(), http.StatusUnauthorized) // 401
-	case errors.Is(err, ErrPasswordTooShort):
+	case errors.Is(err, ErrPasswordTooShort), errors.Is(err, ErrPasswordTooLong):
 		http.Error(w, err.Error(), http.StatusBadRequest) // 400
 	case errors.Is(err, ErrInvalidEmail):
 		http.Error(w, err.Error(), http.StatusBadRequest) // 400

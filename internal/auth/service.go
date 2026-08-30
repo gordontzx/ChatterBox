@@ -11,6 +11,7 @@ import (
 const (
 	refreshTokenBytes = 32
 	minPasswordLength = 8
+	maxPasswordLength = 72
 )
 
 type Service struct {
@@ -44,7 +45,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) error {
 func (s *Service) Login(ctx context.Context, req LoginRequest) (*TokenPair, error) {
 	email, err := normalizeEmail(req.Email)
 	if err != nil {
-		return nil, ErrInvalidEmail
+		return nil, ErrInvalidCredentials
 	}
 
 	user, err := s.store.GetUserByEmail(ctx, email)
@@ -86,6 +87,9 @@ func normalizeEmail(email string) (string, error) {
 func validatePasswordStrength(password string) error {
 	if len(password) < minPasswordLength {
 		return ErrPasswordTooShort
+	}
+	if len(password) > maxPasswordLength {
+		return ErrPasswordTooLong
 	}
 	return nil
 }
