@@ -4,6 +4,10 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"ChatterBox/internal/auth"
 	"ChatterBox/internal/config"
@@ -36,8 +40,34 @@ func main() {
 	mux.HandleFunc("POST /auth/register", authHandler.Register)
 	mux.HandleFunc("POST /auth/login", authHandler.Login)
 
-	log.Printf("Listening on :%s", cfg.Port)
-	if err := http.ListenAndServe(":" + cfg.Port, mux); err != nil {
-		log.Fatal(err)
+	// Configure HTTP server
+	srv := &http.Server{
+		Addr: 		  ":" + cfg.Port,
+		Handler: 	  mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
+
+	// Start server
+	go func() {
+		log.Printf("Listening on :%s", cfg.Port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server error: %v", err)
+		}
+	}()
+
+	// Graceful shutdown on Ctrl+C / SIGTERM
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+	log.Println("shutting down server...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("forced shutdown: %v", err)
+	}
+	log.Println("server stopped")
 }
