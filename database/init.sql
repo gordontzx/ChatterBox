@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
     email           TEXT NOT NULL UNIQUE,
     password_hash   TEXT NOT NULL,
     name            TEXT NOT NULL
-)
+);
 
 CREATE TABLE IF NOT EXISTS sessions (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -15,4 +15,4 @@ CREATE TABLE IF NOT EXISTS sessions (
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_seen_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
     revoked_at          TIMESTAMPTZ
-)
+);

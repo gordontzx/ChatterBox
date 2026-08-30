@@ -27,9 +27,9 @@ func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
 func (s *PostgresStore) CreateUser(ctx context.Context, email, passwordHash, name string) (*User, error) {
 	var u User
 	err := s.pool.QueryRow(ctx,
-		`INSERT INTO users (email, passwordHash, name)
+		`INSERT INTO users (email, password_hash, name)
 		 VALUES ($1, $2, $3)
-		 RETURNING id, email, passwordHash, name`,
+		 RETURNING id, email, password_hash, name`,
 		email, passwordHash, name,
 	).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Name)
 

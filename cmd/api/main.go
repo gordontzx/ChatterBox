@@ -3,14 +3,9 @@ package main
 import (
 	"context"
 	"log"
-	// "log"
-	// "net/http"
-	// "os"
-	// "os/signal"
-	// "syscall"
-	// "time"
+	"net/http"
 
-	// "ChatterBox/internal/auth"
+	"ChatterBox/internal/auth"
 	"ChatterBox/internal/config"
 	"ChatterBox/internal/db"
 )
@@ -30,4 +25,19 @@ func main() {
 		log.Fatalf("Database ping failed: %v", err)
 	}
 	log.Println("Connected to database")
+
+	// Dependencies
+	store := auth.NewPostgresStore(pool)
+	authSvc := auth.NewService(store, []byte(cfg.JWTSecret))
+	authHandler := auth.NewHandler(authSvc)
+
+	// Register routes
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /auth/register", authHandler.Register)
+	mux.HandleFunc("POST /auth/login", authHandler.Login)
+
+	log.Printf("Listening on :%s", cfg.Port)
+	if err := http.ListenAndServe(":" + cfg.Port, mux); err != nil {
+		log.Fatal(err)
+	}
 }
