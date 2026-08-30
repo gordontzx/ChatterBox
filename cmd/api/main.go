@@ -39,6 +39,8 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /auth/register", authHandler.Register)
 	mux.HandleFunc("POST /auth/login", authHandler.Login)
+	mux.HandleFunc("POST /auth/refresh", authHandler.Refresh)
+	mux.HandleFunc("POST /auth/logout", authHandler.Logout)
 
 	// Configure HTTP server
 	srv := &http.Server{

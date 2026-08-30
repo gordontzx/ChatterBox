@@ -13,6 +13,8 @@ type Store interface {
 	CreateUser(ctx context.Context, email, passwordHash, name string) (*User, error)
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
 	CreateSession(ctx context.Context, userID, deviceName, refreshTokenHash string) error
+	GetSessionByRefreshHash(ctx context.Context, refreshTokenHash string) (*Session, error)
+	RevokeSession(ctx context.Context, refreshTokenHash string) error
 }
 
 type PostgresStore struct {
@@ -70,6 +72,36 @@ func (s *PostgresStore) CreateSession(ctx context.Context, userID, deviceName, r
 		`INSERT into sessions (user_id, device_name, refresh_token_hash)
 		 VALUES ($1, $2, $3)`,
 		userID, deviceName, refreshTokenHash,
+	)
+	return err
+}
+
+func (s *PostgresStore) GetSessionByRefreshHash(ctx context.Context, refreshTokenHash string) (*Session, error) {
+	var sess Session
+	err := s.pool.QueryRow(ctx,
+		`Update sessions
+		 SET last_seen_at = now()
+		 WHERE refresh_token_hash =  $1
+		 RETURNING id, user_id, revoked_at`,
+		refreshTokenHash,
+	).Scan(&sess.ID, &sess.UserID, &sess.RevokedAt)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &sess, nil
+}
+
+func (s *PostgresStore) RevokeSession(ctx context.Context, refreshTokenHash string) error {
+	_, err := s.pool.Exec(ctx,
+		`UPDATE sessions
+		 SET revoked_at = now()
+		 WHERE refresh_token_hash = $1 AND revoked_at IS NULL`,
+		refreshTokenHash,
 	)
 	return err
 }

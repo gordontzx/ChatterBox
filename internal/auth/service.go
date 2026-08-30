@@ -106,3 +106,33 @@ func hashToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
 }
+
+func (s *Service) RefreshAccessToken(ctx context.Context, req RefreshRequest) (*AccessTokenResponse, error) {
+	if req.RefreshToken == "" {
+		return nil, ErrInvalidRefreshToken
+	}
+
+	hash := hashToken(req.RefreshToken)
+	session, err := s.store.GetSessionByRefreshHash(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+	if session == nil || session.RevokedAt != nil {
+		return nil, ErrInvalidRefreshToken
+	}
+
+	accessToken, err := IssueAccessToken(session.UserID, s.secret)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AccessTokenResponse{AccessToken: accessToken}, nil
+}
+
+func (s *Service) Logout(ctx context.Context, req LogoutRequest) error {
+	if req.RefreshToken == "" {
+		return nil
+	}
+	hash := hashToken(req.RefreshToken)
+	return s.store.RevokeSession(ctx, hash)
+}

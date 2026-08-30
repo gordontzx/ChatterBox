@@ -1,5 +1,7 @@
 package auth
 
+import "time"
+
 type User struct {
 	ID			 string
 	Email		 string
@@ -22,4 +24,22 @@ type LoginRequest struct {
 type TokenPair struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string	`json:"refresh_token"`
+}
+
+type Session struct {
+	ID		  string
+	UserID    string
+	RevokedAt *time.Time
+}
+
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+type LogoutRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+type AccessTokenResponse struct {
+	AccessToken string `json:"access_token"`
 }

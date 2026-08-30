@@ -5,14 +5,19 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 type fakeStore struct {
-	usersByEmail map[string]*User
+	usersByEmail   map[string]*User
+	sessionsByHash map[string]*Session
 }
 
 func newFakeStore() *fakeStore {
-	return &fakeStore{usersByEmail: map[string]*User{}}
+	return &fakeStore{
+		usersByEmail:   map[string]*User{},
+		sessionsByHash: map[string]*Session{},
+	}
 }
 
 func (f *fakeStore) CreateUser(ctx context.Context, email, passwordHash, name string) (*User, error) {
@@ -29,6 +34,19 @@ func (f *fakeStore) GetUserByEmail(ctx context.Context, email string) (*User, er
 }
 
 func (f *fakeStore) CreateSession(ctx context.Context, userID, deviceName, refreshTokenHash string) error {
+	f.sessionsByHash[refreshTokenHash] = &Session{ID: "session-1", UserID: userID}
+	return nil
+}
+
+func (f *fakeStore) GetSessionByRefreshHash(ctx context.Context, hash string) (*Session, error) {
+	return f.sessionsByHash[hash], nil
+}
+
+func (f *fakeStore) RevokeSession(ctx context.Context, hash string) error {
+	if sess, ok := f.sessionsByHash[hash]; ok {
+		now := time.Now()
+		sess.RevokedAt = &now
+	}
 	return nil
 }
 
@@ -100,5 +118,30 @@ func TestRegister_InvalidEmail(t *testing.T) {
 	err := svc.Register(context.Background(), RegisterRequest{Email: "not-an-email", Password: "password123", Name: "A"})
 	if !errors.Is(err, ErrInvalidEmail) {
 		t.Fatalf("expected ErrInvalidEmail, got %v", err)
+	}
+}
+
+func TestRefreshAndLogout(t *testing.T) {
+	svc := NewService(newFakeStore(), []byte("test-secret"))
+	ctx := context.Background()
+
+	svc.Register(ctx, RegisterRequest{Email: "a@b.com", Password: "password123", Name: "A"})
+	tokens, _ := svc.Login(ctx, LoginRequest{Email: "a@b.com", Password: "password123", DeviceName: "test"})
+
+	// refresh should succeed
+	resp, err := svc.RefreshAccessToken(ctx, RefreshRequest{RefreshToken: tokens.RefreshToken})
+	if err != nil || resp.AccessToken == "" {
+		t.Fatalf("expected valid refresh, got err=%v resp=%v", err, resp)
+	}
+
+	// logout
+	if err := svc.Logout(ctx, LogoutRequest{RefreshToken: tokens.RefreshToken}); err != nil {
+		t.Fatalf("logout failed: %v", err)
+	}
+
+	// refresh after logout should fail
+	_, err = svc.RefreshAccessToken(ctx, RefreshRequest{RefreshToken: tokens.RefreshToken})
+	if !errors.Is(err, ErrInvalidRefreshToken) {
+		t.Fatalf("expected ErrInvalidRefreshToken after logout, got %v", err)
 	}
 }

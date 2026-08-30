@@ -8,4 +8,5 @@ var (
 	ErrPasswordTooShort		  = errors.New("password must be at least 8 characters")
 	ErrPasswordTooLong		  = errors.New("password must be at most 72 characters")
 	ErrInvalidEmail			  = errors.New("invalid email format")
+	ErrInvalidRefreshToken	  = errors.New("invalid or expired refresh token")
 )

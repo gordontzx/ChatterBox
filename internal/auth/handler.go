@@ -52,6 +52,43 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// POST /auth/refresh
+func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
+	var req RefreshRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	resp, err := h.svc.RefreshAccessToken(r.Context(), req)
+	if err != nil {
+		writeAuthError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Printf("failed to encode refresh response: %v", err)
+	}
+}
+
+// POST /auth/logout
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	var req LogoutRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.svc.Logout(r.Context(), req); err != nil {
+		writeAuthError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent) // 204
+}
+
 func writeAuthError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, ErrEmailAlreadyRegistered):
@@ -62,6 +99,8 @@ func writeAuthError(w http.ResponseWriter, err error) {
 		http.Error(w, err.Error(), http.StatusBadRequest) // 400
 	case errors.Is(err, ErrInvalidEmail):
 		http.Error(w, err.Error(), http.StatusBadRequest) // 400
+	case errors.Is(err, ErrInvalidRefreshToken):
+		http.Error(w, err.Error(), http.StatusUnauthorized) // 401
 	default:
 		log.Printf("unhandled auth error: %v", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
