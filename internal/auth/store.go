@@ -12,6 +12,7 @@ import (
 type Store interface {
 	CreateUser(ctx context.Context, email, passwordHash, name string) (*User, error)
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
+	CreateSession(ctx context.Context, userID, deviceName, refreshTokenHash string) error
 }
 
 type PostgresStore struct {
@@ -61,4 +62,14 @@ func (s *PostgresStore) GetUserByEmail(ctx context.Context, email string) (*User
 	}
 
 	return &u, nil
+}
+
+// Inserts a new session row for a logged-in user/device
+func (s *PostgresStore) CreateSession(ctx context.Context, userID, deviceName, refreshTokenHash string) error {
+	_, err := s.pool.Exec(ctx,
+		`INSERT into sessions (user_id, device_name, refresh_token_hash)
+		 VALUES ($1, $2, $3)`,
+		userID, deviceName, refreshTokenHash,
+	)
+	return err
 }
