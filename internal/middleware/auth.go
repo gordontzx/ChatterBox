@@ -12,6 +12,7 @@ import (
 type contextKey string
 
 const userIDContextKey contextKey = "userID"
+const UserIDContextKeyForTests = userIDContextKey
 
 func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
