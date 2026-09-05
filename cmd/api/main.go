@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"ChatterBox/internal/auth"
+	"ChatterBox/internal/chat"
 	"ChatterBox/internal/config"
 	"ChatterBox/internal/db"
+	"ChatterBox/internal/middleware"
 )
 
 func main() {
@@ -31,16 +33,24 @@ func main() {
 	log.Println("Connected to database")
 
 	// Dependencies
-	store := auth.NewPostgresStore(pool)
-	authSvc := auth.NewService(store, []byte(cfg.JWTSecret))
+	authStore := auth.NewPostgresStore(pool)
+	authSvc := auth.NewService(authStore, []byte(cfg.JWTSecret))
 	authHandler := auth.NewHandler(authSvc)
 
+	chatStore := chat.NewPostgresStore(pool)
+	chatSvc := chat.NewService(chatStore)
+	chatHandler := chat.NewHandler(chatSvc)
+
 	// Register routes
+	requireAuth := middleware.RequireAuth([]byte(cfg.JWTSecret))
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /auth/register", authHandler.Register)
 	mux.HandleFunc("POST /auth/login", authHandler.Login)
 	mux.HandleFunc("POST /auth/refresh", authHandler.Refresh)
 	mux.HandleFunc("POST /auth/logout", authHandler.Logout)
+	mux.Handle("POST /chats/direct", requireAuth(http.HandlerFunc(chatHandler.CreateDirect)))
+	mux.Handle("GET /chats", requireAuth(http.HandlerFunc(chatHandler.List)))
 
 	// Configure HTTP server
 	srv := &http.Server{
