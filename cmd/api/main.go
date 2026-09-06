@@ -35,42 +35,42 @@ func main() {
 	}
 	log.Println("Connected to database")
 
+	// dependencies
+	authStore := auth.NewPostgresStore(pool)
+	authSvc := auth.NewService(authStore, []byte(cfg.JWTSecret))
+	authHandler := auth.NewHandler(authSvc)
+
+	chatStore := chat.NewPostgresStore(pool)
+	chatSvc := chat.NewService(chatStore)
+	chatHandler := chat.NewHandler(chatSvc)
+
+	msgStore := message.NewPostgresStore(pool)
+	msgSvc := message.NewService(msgStore)
+	msgHandler := message.NewHandler(msgSvc)
+
+	userStore := user.NewPostgresStore(pool)
+	userSvc := user.NewService(userStore)
+	userHandler := user.NewHandler(userSvc)
+
+	hub := ws.NewHub()
+	wsHandler := ws.NewHandler(hub, []byte(cfg.JWTSecret), msgSvc)
 
 	// Register routes
 	requireAuth := middleware.RequireAuth([]byte(cfg.JWTSecret))
 	mux := http.NewServeMux()
-
-	authStore := auth.NewPostgresStore(pool)
-	authSvc := auth.NewService(authStore, []byte(cfg.JWTSecret))
-	authHandler := auth.NewHandler(authSvc)
 
 	mux.HandleFunc("POST /auth/register", authHandler.Register)
 	mux.HandleFunc("POST /auth/login", authHandler.Login)
 	mux.HandleFunc("POST /auth/refresh", authHandler.Refresh)
 	mux.HandleFunc("POST /auth/logout", authHandler.Logout)
 
-	chatStore := chat.NewPostgresStore(pool)
-	chatSvc := chat.NewService(chatStore)
-	chatHandler := chat.NewHandler(chatSvc)
-
 	mux.Handle("POST /chats/direct", requireAuth(http.HandlerFunc(chatHandler.CreateDirect)))
 	mux.Handle("GET /chats", requireAuth(http.HandlerFunc(chatHandler.List)))
 
-	msgStore := message.NewPostgresStore(pool)
-	msgSvc := message.NewService(msgStore)
-	msgHandler := message.NewHandler(msgSvc)
-
 	mux.Handle("GET /chats/{chatID}/messages", requireAuth(http.HandlerFunc(msgHandler.GetMessages)))
 
-	userStore := user.NewPostgresStore(pool)
-	userSvc := user.NewService(userStore)
-	userHandler := user.NewHandler(userSvc)
-
-	mux.Handle("GEt /user/me", requireAuth(http.HandlerFunc(userHandler.Me)))
-	mux.Handle("GET /user/search", requireAuth(http.HandlerFunc(userHandler.SearchByEmail)))
-
-	hub := ws.NewHub()
-	wsHandler := ws.NewHandler(hub, []byte(cfg.JWTSecret), msgSvc)
+	mux.Handle("GET /users/me", requireAuth(http.HandlerFunc(userHandler.Me)))
+	mux.Handle("GET /users/search", requireAuth(http.HandlerFunc(userHandler.SearchByEmail)))
 
 	mux.HandleFunc("GET /ws", wsHandler.ServeWS)
 
