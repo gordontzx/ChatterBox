@@ -28,7 +28,7 @@ func (s *PostgresStore) FindDirectChat(ctx context.Context, user1, user2 string)
 	var c Chat
 	err := s.pool.QueryRow(ctx,
 		`SELECT c.id, c.created_at
-		 FROM chat c
+		 FROM chats c
 		 WHERE c.id IN (
 			 SELECT chat_id FROM chat_members WHERE user_id = $1
 			 INTERSECT
