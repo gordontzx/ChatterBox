@@ -16,7 +16,7 @@ import (
 func TestServeWS_AuthAndDelivery(t *testing.T) {
 	secret := []byte("test-secret")
 	hub := NewHub()
-	handler := NewHandler(hub, secret)
+	handler := NewHandler(hub, secret, nil)
 
 	server := httptest.NewServer(http.HandlerFunc(handler.ServeWS))
 	defer server.Close()
@@ -53,7 +53,7 @@ func TestServeWS_AuthAndDelivery(t *testing.T) {
 
 func TestServeWS_MissingToken_Rejected(t *testing.T) {
 	hub := NewHub()
-	handler := NewHandler(hub, []byte("test-secret"))
+	handler := NewHandler(hub, []byte("test-secret"), nil)
 
 	server := httptest.NewServer(http.HandlerFunc(handler.ServeWS))
 	defer server.Close()
@@ -71,7 +71,7 @@ func TestServeWS_MissingToken_Rejected(t *testing.T) {
 
 func TestServeWS_InvalidToken_Rejected(t *testing.T) {
 	hub := NewHub()
-	handler := NewHandler(hub, []byte("test-secret"))
+	handler := NewHandler(hub, []byte("test-secret"), nil)
 
 	server := httptest.NewServer(http.HandlerFunc(handler.ServeWS))
 	defer server.Close()

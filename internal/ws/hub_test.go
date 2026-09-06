@@ -7,7 +7,7 @@ import (
 
 func TestHub_RegisterAndSendToUser(t *testing.T) {
 	hub := NewHub()
-	client := NewClient("user-1", nil, hub)
+	client := NewClient("user-1", nil, hub, nil)
 
 	hub.Register(client)
 
@@ -25,8 +25,8 @@ func TestHub_RegisterAndSendToUser(t *testing.T) {
 
 func TestHub_SendToUser_MultiDevice(t *testing.T) {
 	hub := NewHub()
-	phone := NewClient("user-1", nil, hub)
-	laptop := NewClient("user-1", nil, hub)
+	phone := NewClient("user-1", nil, hub, nil)
+	laptop := NewClient("user-1", nil, hub, nil)
 
 	hub.Register(phone)
 	hub.Register(laptop)
@@ -55,8 +55,8 @@ func TestHub_SendToUser_UnknownUser_NoOp(t *testing.T) {
 
 func TestHub_SendToUser_OnlyTargetUser(t *testing.T) {
 	hub := NewHub()
-	alice := NewClient("alice", nil, hub)
-	bob := NewClient("bob", nil, hub)
+	alice := NewClient("alice", nil, hub, nil)
+	bob := NewClient("bob", nil, hub, nil)
 
 	hub.Register(alice)
 	hub.Register(bob)
@@ -80,7 +80,7 @@ func TestHub_SendToUser_OnlyTargetUser(t *testing.T) {
 
 func TestHub_Unregister_RemovesClientAndClosesChannel(t *testing.T) {
 	hub := NewHub()
-	client := NewClient("user-1", nil, hub)
+	client := NewClient("user-1", nil, hub, nil)
 
 	hub.Register(client)
 	hub.Unregister(client)
@@ -97,7 +97,7 @@ func TestHub_Unregister_RemovesClientAndClosesChannel(t *testing.T) {
 
 func TestHub_Unregister_LastDeviceRemovesUserEntirely(t *testing.T) {
 	hub := NewHub()
-	client := NewClient("user-1", nil, hub)
+	client := NewClient("user-1", nil, hub, nil)
 	hub.Register(client)
 
 	hub.mut.RLock()
@@ -119,7 +119,7 @@ func TestHub_Unregister_LastDeviceRemovesUserEntirely(t *testing.T) {
 
 func TestHub_SendToUser_FullBuffer_DoesNotBlock(t *testing.T) {
 	hub := NewHub()
-	client := NewClient("user-1", nil, hub)
+	client := NewClient("user-1", nil, hub, nil)
 	hub.Register(client)
 
 	// fill the buffer completely

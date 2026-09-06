@@ -4,8 +4,10 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/gorilla/websocket"
 	"ChatterBox/internal/auth"
+	"ChatterBox/internal/message"
+
+	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{
@@ -19,10 +21,11 @@ var upgrader = websocket.Upgrader{
 type Handler struct {
 	hub    *Hub
 	secret []byte
+	msgSvc *message.Service
 }
 
-func NewHandler(hub *Hub, secret []byte) *Handler {
-	return &Handler{hub: hub, secret: secret}
+func NewHandler(hub *Hub, secret []byte, msgSvc *message.Service) *Handler {
+	return &Handler{hub: hub, secret: secret, msgSvc: msgSvc}
 }
 
 // GET /ws?token=<access_token>
@@ -45,7 +48,7 @@ func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := NewClient(claims.UserID, conn, h.hub)
+	client := NewClient(claims.UserID, conn, h.hub, h.msgSvc)
 	h.hub.Register(client)
 
 	go client.WritePump()

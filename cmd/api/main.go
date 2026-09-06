@@ -13,7 +13,9 @@ import (
 	"ChatterBox/internal/chat"
 	"ChatterBox/internal/config"
 	"ChatterBox/internal/db"
+	"ChatterBox/internal/message"
 	"ChatterBox/internal/middleware"
+	"ChatterBox/internal/ws"
 )
 
 func main() {
@@ -41,6 +43,12 @@ func main() {
 	chatSvc := chat.NewService(chatStore)
 	chatHandler := chat.NewHandler(chatSvc)
 
+	msgStore := message.NewPostgresStore(pool)
+	msgSvc := message.NewService(msgStore)
+
+	hub := ws.NewHub()
+	wsHandler := ws.NewHandler(hub, []byte(cfg.JWTSecret), msgSvc)
+
 	// Register routes
 	requireAuth := middleware.RequireAuth([]byte(cfg.JWTSecret))
 
@@ -51,6 +59,7 @@ func main() {
 	mux.HandleFunc("POST /auth/logout", authHandler.Logout)
 	mux.Handle("POST /chats/direct", requireAuth(http.HandlerFunc(chatHandler.CreateDirect)))
 	mux.Handle("GET /chats", requireAuth(http.HandlerFunc(chatHandler.List)))
+	mux.HandleFunc("GET /ws", wsHandler.ServeWS)
 
 	// Configure HTTP server
 	srv := &http.Server{

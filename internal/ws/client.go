@@ -1,10 +1,14 @@
 package ws
 
 import (
+	"context"
+	"encoding/json"
 	"log"
 	"time"
 
 	"github.com/gorilla/websocket"
+
+	"ChatterBox/internal/message"
 )
 
 const (
@@ -19,14 +23,16 @@ type Client struct {
 	conn   *websocket.Conn
 	send   chan []byte
 	hub    *Hub
+	msgSvc *message.Service
 }
 
-func NewClient(userID string, conn *websocket.Conn, hub *Hub) *Client {
+func NewClient(userID string, conn *websocket.Conn, hub *Hub, msgSvc *message.Service) *Client {
 	return &Client{
 		userID: userID,
 		conn:	conn,
 		send:	make(chan []byte, sendBufferSize),
 		hub:	hub,
+		msgSvc:	msgSvc,
 	}
 }
 
@@ -43,7 +49,7 @@ func (c *Client) ReadPump() {
 	})
 
 	for {
-		_, message, err := c.conn.ReadMessage()
+		_, raw, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("unexpected close for user %s: %v", c.userID, err)
@@ -51,9 +57,45 @@ func (c *Client) ReadPump() {
 			break
 		}
 
-		// temp placeholder
-		log.Printf("received from user %s: %v", c.userID, message)
+		c.handleIncoming(raw)
 	}
+}
+
+func (c *Client) handleIncoming(raw []byte) {
+	var incoming message.IncomingMessage
+	if err := json.Unmarshal(raw, &incoming); err != nil {
+		log.Printf("malformed frame from user %s: %v", c.userID, err)
+		return
+	}
+
+	switch incoming.Type {
+	case "message":
+		c.handleSendMessage(incoming)
+	default:
+		log.Printf("unknown frame type %q from user %s", incoming.Type, c.userID)
+	}
+}
+
+func (c *Client) handleSendMessage(incoming message.IncomingMessage) {
+	result, err := c.msgSvc.SendMessage(context.Background(), c.userID, incoming.ChatID, incoming.Content)
+	if err != nil {
+		log.Printf("send message failed for user %s: %v", c.userID, err)
+		return
+	}
+
+	event := message.OutgoingEvent{Type: "message", Message: result.Message}
+	payload, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("failed to marshal outgoing event: %v", err)
+		return
+	}
+
+	for _, memberID := range result.OtherMemberIDs {
+		c.hub.SendToUser(memberID, payload)
+	}
+
+	// echo to sender
+	c.hub.SendToUser(c.userID, payload)
 }
 
 func (c *Client) WritePump() {
