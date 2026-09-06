@@ -2,8 +2,9 @@ package user
 
 import (
 	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
-	"strings"
 
 	"ChatterBox/internal/middleware"
 )
@@ -16,37 +17,50 @@ func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
 }
 
-// GET /users/search?email=<search_email>
+// GET /users/me (protected route)
+func (h* Handler) Me(w http.ResponseWriter, r *http.Request) {
+	callerID := middleware.UserIDFromContext(r.Context())
+
+	u, err := h.svc.FindByID(r.Context(), callerID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(u)
+}
+
+// GET /users/search?email=<search_email> (protected route)
 func (h *Handler) SearchByEmail(w http.ResponseWriter, r *http.Request) {
 	_ = middleware.UserIDFromContext(r.Context())
 
-	rawEmail := r.URL.Query().Get("email")
-	if rawEmail == "" {
+	email := r.URL.Query().Get("email")
+	if email == "" {
 		http.Error(w, "missing 'email' query parameter", http.StatusBadRequest)
 		return
 	}
 
-	email, err := normalizeEmail(r.URL.Query().Get("email"))
+	u, err := h.svc.FindByEmail(r.Context(), email)
 	if err != nil {
-		http.Error(w, "invalid email format", http.StatusBadRequest)
+		writeError(w, err)
 		return
 	}
-	
-	userSummary, err := h.svc.FindByEmail(r.Context(), email)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-	}
-	if userSummary == nil {
-		http.Error(w, "user not found", http.StatusNotFound)
-	}
 
-	json.NewEncoder(w).Encode(userSummary)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(u)
 }
 
-func normalizeEmail(email string) (string, error) {
-	trimmed := strings.ToLower(strings.TrimSpace(email))
-	if trimmed == "" || !strings.Contains(trimmed, "@") || strings.ContainsAny(trimmed, " \t\n") {
-		return "", ErrInvalidEmail
+func writeError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, ErrInvalidEmail):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	case errors.Is(err, ErrUserNotFound):
+		http.Error(w, err.Error(), http.StatusNotFound)
+	default:
+		log.Printf("unhandled user error: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
-	return trimmed, nil
 }

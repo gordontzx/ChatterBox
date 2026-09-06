@@ -1,7 +1,7 @@
 package user
 
-type UserSummary struct {
-	ID			 string
-	Email		 string
-	Name 		 string
+type PublicUser struct {
+	ID	  string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
 }

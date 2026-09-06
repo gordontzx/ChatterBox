@@ -9,7 +9,8 @@ import (
 )
 
 type Store interface {
-	FindByEmail(ctx context.Context, email string) (*UserSummary, error)
+	FindByEmail(ctx context.Context, email string) (*PublicUser, error)
+	FindByID(ctx context.Context, userID string) (*PublicUser, error)
 }
 
 type PostgresStore struct {
@@ -20,8 +21,8 @@ func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
 	return &PostgresStore{pool: pool}
 }
 
-func (s *PostgresStore) FindByEmail(ctx context.Context, email string) (*UserSummary, error) {
-	var u UserSummary
+func (s *PostgresStore) FindByEmail(ctx context.Context, email string) (*PublicUser, error) {
+	var u PublicUser
 	err := s.pool.QueryRow(ctx,
 		`SELECT id, name, email FROM users WHERE email = $1`,
 		email,
@@ -30,6 +31,26 @@ func (s *PostgresStore) FindByEmail(ctx context.Context, email string) (*UserSum
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
+	if err != nil {
+		return nil, err
+	}
 
-	return &u, err
+	return &u, nil
+}
+
+func (s *PostgresStore) FindByID(ctx context.Context, userID string) (*PublicUser, error) {
+	var u PublicUser
+	err := s.pool.QueryRow(ctx,
+		`SELECT id, name, email FROM users WHERE id = $1`,
+		userID,
+	).Scan(&u.ID, &u.Name, &u.Email)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &u, nil
 }
