@@ -45,6 +45,7 @@ func main() {
 
 	msgStore := message.NewPostgresStore(pool)
 	msgSvc := message.NewService(msgStore)
+	msgHandler := message.NewHandler(msgSvc)
 
 	hub := ws.NewHub()
 	wsHandler := ws.NewHandler(hub, []byte(cfg.JWTSecret), msgSvc)
@@ -60,6 +61,7 @@ func main() {
 	mux.Handle("POST /chats/direct", requireAuth(http.HandlerFunc(chatHandler.CreateDirect)))
 	mux.Handle("GET /chats", requireAuth(http.HandlerFunc(chatHandler.List)))
 	mux.HandleFunc("GET /ws", wsHandler.ServeWS)
+	mux.Handle("GET /chats/{chatID}/messages", requireAuth(http.HandlerFunc(msgHandler.GetMessages)))
 
 	// Configure HTTP server
 	srv := &http.Server{

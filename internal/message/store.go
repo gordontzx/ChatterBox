@@ -10,6 +10,7 @@ type Store interface {
 	IsChatMember(ctx context.Context, chatID, userID string) (bool, error)
 	OtherChatMemberIDs(ctx context.Context, chatID, excludeUserID string) ([]string, error)
 	CreateMessage(ctx context.Context, chatID, senderID, content string) (*Message, error)
+	GetMessagesSince(ctx context.Context, chatID string, sinceSeq int64, limit int) ([]Message, error)
 }
 
 type PostgresStore struct {
@@ -84,4 +85,30 @@ func (s *PostgresStore) CreateMessage(ctx context.Context, chatID, senderID, con
 	}
 
 	return &m, nil
+}
+
+// Return messages with seq > sinceSeq, capped at limit
+func (s *PostgresStore) GetMessagesSince(ctx context.Context, chatID string, sinceSeq int64, limit int) ([]Message, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT id, chat_id, sender_id, seq, content, created_at
+		 FROM messages
+		 WHERE chat_id = $1 AND seq > $2
+		 ORDER BY seq ASC
+		 LIMIT $3`,
+		chatID, sinceSeq, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var m Message
+		if err := rows.Scan(&m.ID, &m.ChatID, &m.SenderID, &m.Seq, &m.Content, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		messages = append(messages, m)
+	}
+	return messages, rows.Err()
 }

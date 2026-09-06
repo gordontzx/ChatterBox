@@ -5,7 +5,10 @@ import (
 	"strings"
 )
 
-const maxContentLength = 4096
+const (
+	maxContentLength = 4096
+	defaultMessageLimit = 100
+)
 
 type Service struct {
 	store Store
@@ -49,4 +52,16 @@ func (s *Service) SendMessage(ctx context.Context, senderID, chatID, content str
 	}
 
 	return &SendResult{Message: *msg, OtherMemberIDs: otherIDs}, nil
+}
+
+func (s *Service) GetMessagesSince(ctx context.Context, callerID, chatID string, sinceSeq int64) ([]Message, error) {
+	isMember, err := s.store.IsChatMember(ctx, chatID, callerID)
+	if err != nil {
+		return nil, err
+	}
+	if !isMember {
+		return nil, ErrNotChatMember
+	}
+
+	return s.store.GetMessagesSince(ctx, chatID, sinceSeq, defaultMessageLimit)
 }

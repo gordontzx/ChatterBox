@@ -46,6 +46,16 @@ func (f *fakeStore) CreateMessage(ctx context.Context, chatID, senderID, content
 	return &m, nil
 }
 
+func (f *fakeStore) GetMessagesSince(ctx context.Context, chatID string, sinceSeq int64, limit int) ([]Message, error) {
+	var result []Message
+	for _, m := range f.messages {
+		if m.ChatID == chatID && m.Seq > sinceSeq {
+			result = append(result, m)
+		}
+	}
+	return result, nil
+}
+
 func TestSendMessage_Success(t *testing.T) {
 	store := newFakeStore()
 	store.members["chat-1"] = []string{"alice", "bob"}
@@ -98,5 +108,56 @@ func TestSendMessage_ContentTooLong(t *testing.T) {
 	_, err := svc.SendMessage(context.Background(), "alice", "chat-1", string(longContent))
 	if !errors.Is(err, ErrContentTooLong) {
 		t.Fatalf("expected ErrContentTooLong, got %v", err)
+	}
+}
+
+func TestGetMessagesSince_ReturnsOnlyNewer(t *testing.T) {
+	store := newFakeStore()
+	store.members["chat-1"] = []string{"alice", "bob"}
+	svc := NewService(store)
+	ctx := context.Background()
+
+	svc.SendMessage(ctx, "alice", "chat-1", "first")
+	svc.SendMessage(ctx, "bob", "chat-1", "second")
+	svc.SendMessage(ctx, "alice", "chat-1", "third")
+
+	messages, err := svc.GetMessagesSince(ctx, "alice", "chat-1", 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("expected 2 messages (seq 2 and 3), got %d", len(messages))
+	}
+	if messages[0].Content != "second" || messages[1].Content != "third" {
+		t.Fatalf("expected messages in order, got %+v", messages)
+	}
+}
+
+func TestGetMessagesSince_NonMember_Forbidden(t *testing.T) {
+	store := newFakeStore()
+	store.members["chat-1"] = []string{"alice", "bob"}
+	svc := NewService(store)
+
+	_, err := svc.GetMessagesSince(context.Background(), "carol", "chat-1", 0)
+	if !errors.Is(err, ErrNotChatMember) {
+		t.Fatalf("expected ErrNotChatMember, got %v", err)
+	}
+}
+
+func TestGetMessagesSince_SinceZero_ReturnsAll(t *testing.T) {
+	store := newFakeStore()
+	store.members["chat-1"] = []string{"alice", "bob"}
+	svc := NewService(store)
+	ctx := context.Background()
+
+	svc.SendMessage(ctx, "alice", "chat-1", "one")
+	svc.SendMessage(ctx, "bob", "chat-1", "two")
+
+	messages, err := svc.GetMessagesSince(ctx, "alice", "chat-1", 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("expected all 2 messages, got %d", len(messages))
 	}
 }
