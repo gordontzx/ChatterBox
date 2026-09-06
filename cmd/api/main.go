@@ -15,6 +15,7 @@ import (
 	"ChatterBox/internal/db"
 	"ChatterBox/internal/message"
 	"ChatterBox/internal/middleware"
+	"ChatterBox/internal/user"
 	"ChatterBox/internal/ws"
 )
 
@@ -47,6 +48,10 @@ func main() {
 	msgSvc := message.NewService(msgStore)
 	msgHandler := message.NewHandler(msgSvc)
 
+	userStore := user.NewPostgresStore(pool)
+	userSvc := user.NewService(userStore)
+	userHandler := user.NewHandler(userSvc)
+
 	hub := ws.NewHub()
 	wsHandler := ws.NewHandler(hub, []byte(cfg.JWTSecret), msgSvc)
 
@@ -62,6 +67,7 @@ func main() {
 	mux.Handle("GET /chats", requireAuth(http.HandlerFunc(chatHandler.List)))
 	mux.HandleFunc("GET /ws", wsHandler.ServeWS)
 	mux.Handle("GET /chats/{chatID}/messages", requireAuth(http.HandlerFunc(msgHandler.GetMessages)))
+	mux.Handle("GET /user/search", requireAuth(http.HandlerFunc(userHandler.SearchByEmail)))
 
 	// Configure HTTP server
 	srv := &http.Server{
