@@ -9,15 +9,24 @@ import (
 // fakeStore is an in-memory Store implementation for testing Service
 // without touching Postgres.
 type fakeStore struct {
-	users map[string]bool           // userID -> exists
-	chats map[string]*Chat          // chatID -> Chat
+	users map[string]bool          // userID -> exists
+	names map[string]string        // userID -> display name
+	chats map[string]*Chat         // chatID -> Chat
 }
 
 func newFakeStore() *fakeStore {
 	return &fakeStore{
 		users: map[string]bool{},
+		names: map[string]string{},
 		chats: map[string]*Chat{},
 	}
+}
+
+// seedUser registers a user as existing, with a display name, for use
+// in FindDirectChat/CreateDirectChat's member construction.
+func (f *fakeStore) seedUser(id, name string) {
+	f.users[id] = true
+	f.names[id] = name
 }
 
 func (f *fakeStore) UserExists(ctx context.Context, userID string) (bool, error) {
@@ -26,11 +35,11 @@ func (f *fakeStore) UserExists(ctx context.Context, userID string) (bool, error)
 
 func (f *fakeStore) FindDirectChat(ctx context.Context, userA, userB string) (*Chat, error) {
 	for _, c := range f.chats {
-		if len(c.MemberIDs) != 2 {
+		if len(c.Members) != 2 {
 			continue
 		}
-		hasA := c.MemberIDs[0] == userA || c.MemberIDs[1] == userA
-		hasB := c.MemberIDs[0] == userB || c.MemberIDs[1] == userB
+		hasA := c.Members[0].ID == userA || c.Members[1].ID == userA
+		hasB := c.Members[0].ID == userB || c.Members[1].ID == userB
 		if hasA && hasB {
 			return c, nil
 		}
@@ -40,7 +49,13 @@ func (f *fakeStore) FindDirectChat(ctx context.Context, userA, userB string) (*C
 
 func (f *fakeStore) CreateDirectChat(ctx context.Context, userA, userB string) (*Chat, error) {
 	id := "chat-" + userA + "-" + userB
-	c := &Chat{ID: id, MemberIDs: []string{userA, userB}}
+	c := &Chat{
+		ID: id,
+		Members: []Member{
+			{ID: userA, Name: f.names[userA]},
+			{ID: userB, Name: f.names[userB]},
+		},
+	}
 	f.chats[id] = c
 	return c, nil
 }
@@ -48,8 +63,8 @@ func (f *fakeStore) CreateDirectChat(ctx context.Context, userA, userB string) (
 func (f *fakeStore) ListChatsForUser(ctx context.Context, userID string) ([]*Chat, error) {
 	var result []*Chat
 	for _, c := range f.chats {
-		for _, m := range c.MemberIDs {
-			if m == userID {
+		for _, m := range c.Members {
+			if m.ID == userID {
 				result = append(result, c)
 				break
 			}
@@ -60,23 +75,45 @@ func (f *fakeStore) ListChatsForUser(ctx context.Context, userID string) ([]*Cha
 
 func TestCreateOrGetDirectChat_CreatesNewChat(t *testing.T) {
 	store := newFakeStore()
-	store.users["alice"] = true
-	store.users["bob"] = true
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
 	svc := NewService(store)
 
 	c, err := svc.CreateOrGetDirectChat(context.Background(), "alice", "bob")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if c == nil || len(c.MemberIDs) != 2 {
+	if c == nil || len(c.Members) != 2 {
 		t.Fatalf("expected a chat with 2 members, got %+v", c)
+	}
+}
+
+func TestCreateOrGetDirectChat_IncludesMemberNames(t *testing.T) {
+	store := newFakeStore()
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
+	svc := NewService(store)
+
+	c, err := svc.CreateOrGetDirectChat(context.Background(), "alice", "bob")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var gotBobName string
+	for _, m := range c.Members {
+		if m.ID == "bob" {
+			gotBobName = m.Name
+		}
+	}
+	if gotBobName != "Bob" {
+		t.Fatalf("expected member name 'Bob', got %q", gotBobName)
 	}
 }
 
 func TestCreateOrGetDirectChat_ReturnsExistingChat(t *testing.T) {
 	store := newFakeStore()
-	store.users["alice"] = true
-	store.users["bob"] = true
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
 	svc := NewService(store)
 	ctx := context.Background()
 
@@ -98,8 +135,8 @@ func TestCreateOrGetDirectChat_ReturnsExistingChat(t *testing.T) {
 func TestCreateOrGetDirectChat_ReturnsExistingChat_ReverseOrder(t *testing.T) {
 	// Calling with (bob, alice) should still find the chat created as (alice, bob).
 	store := newFakeStore()
-	store.users["alice"] = true
-	store.users["bob"] = true
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
 	svc := NewService(store)
 	ctx := context.Background()
 
@@ -116,7 +153,7 @@ func TestCreateOrGetDirectChat_ReturnsExistingChat_ReverseOrder(t *testing.T) {
 
 func TestCreateOrGetDirectChat_CannotChatWithSelf(t *testing.T) {
 	store := newFakeStore()
-	store.users["alice"] = true
+	store.seedUser("alice", "Alice")
 	svc := NewService(store)
 
 	_, err := svc.CreateOrGetDirectChat(context.Background(), "alice", "alice")
@@ -127,8 +164,8 @@ func TestCreateOrGetDirectChat_CannotChatWithSelf(t *testing.T) {
 
 func TestCreateOrGetDirectChat_OtherUserNotFound(t *testing.T) {
 	store := newFakeStore()
-	store.users["alice"] = true
-	// "bob" deliberately not added to store.users
+	store.seedUser("alice", "Alice")
+	// "bob" deliberately not seeded
 	svc := NewService(store)
 
 	_, err := svc.CreateOrGetDirectChat(context.Background(), "alice", "bob")
@@ -139,9 +176,9 @@ func TestCreateOrGetDirectChat_OtherUserNotFound(t *testing.T) {
 
 func TestListChats_ReturnsOnlyCallersChats(t *testing.T) {
 	store := newFakeStore()
-	store.users["alice"] = true
-	store.users["bob"] = true
-	store.users["carol"] = true
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
+	store.seedUser("carol", "Carol")
 	svc := NewService(store)
 	ctx := context.Background()
 
@@ -154,6 +191,32 @@ func TestListChats_ReturnsOnlyCallersChats(t *testing.T) {
 	}
 	if len(chats) != 1 {
 		t.Fatalf("expected exactly 1 chat for alice, got %d", len(chats))
+	}
+}
+
+func TestListChats_IncludesMembersWithNames(t *testing.T) {
+	store := newFakeStore()
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
+	svc := NewService(store)
+	ctx := context.Background()
+
+	svc.CreateOrGetDirectChat(ctx, "alice", "bob")
+
+	chats, err := svc.ListChats(ctx, "alice")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(chats) != 1 || len(chats[0].Members) != 2 {
+		t.Fatalf("expected 1 chat with 2 members, got %+v", chats)
+	}
+
+	names := map[string]bool{}
+	for _, m := range chats[0].Members {
+		names[m.Name] = true
+	}
+	if !names["Alice"] || !names["Bob"] {
+		t.Fatalf("expected both Alice and Bob in member names, got %+v", chats[0].Members)
 	}
 }
 

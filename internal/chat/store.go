@@ -45,7 +45,12 @@ func (s *PostgresStore) FindDirectChat(ctx context.Context, user1, user2 string)
 		return nil, err
 	}
 
-	c.MemberIDs = []string{user1, user2}
+	members, err := s.getChatMembers(ctx, c.ID)
+	if err != nil {
+		return nil, err
+	}
+	c.Members = members
+
 	return &c, nil
 }
 
@@ -76,8 +81,39 @@ func (s *PostgresStore) CreateDirectChat(ctx context.Context, user1, user2 strin
 		return nil, err
 	}
 
-	c.MemberIDs = []string{user1, user2}
+	members, err := s.getChatMembers(ctx, c.ID)
+	if err != nil {
+		return nil, err
+	}
+	c.Members = members
+
 	return &c, nil
+}
+
+// Gets members info (id + name) for a single chat
+func (s *PostgresStore) getChatMembers(ctx context.Context, chatID string) ([]Member, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT u.id, u.name
+		 FROM chat_members cm
+		 JOIN users u ON u.id = cm.user_id
+		 WHERE cm.chat_id = $1`,
+		chatID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var members []Member
+	for rows.Next() {
+		var m Member
+		if err := rows.Scan(&m.ID, &m.Name); err != nil {
+			return nil, err
+		}
+		members = append(members, m)
+	}
+
+	return members, rows.Err()
 }
 
 // Returns all chats the given user is a member of
@@ -93,17 +129,56 @@ func (s *PostgresStore) ListChatsForUser(ctx context.Context, userID string) ([]
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	var chats []*Chat
+	chatsByID := make(map[string]*Chat)
+	var chatIDs []string
+
 	for rows.Next() {
 		var c Chat
 		if err := rows.Scan(&c.ID, &c.CreatedAt); err != nil {
+			rows.Close()
 			return nil, err
 		}
 		chats = append(chats, &c)
+		chatsByID[c.ID] = &c
+		chatIDs = append(chatIDs, c.ID)
 	}
-	return chats, rows.Err()
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if len(chatIDs) == 0 {
+		return chats, nil
+	}
+
+	// Get all members from found chat IDs
+	memberRows, err := s.pool.Query(ctx,
+		`SELECT cm.chat_id, u.id, u.name
+		 FROM chat_members cm
+		 JOIN users u ON u.id = cm.user_id
+		 WHERE cm.chat_id = ANY($1)
+		 ORDER BY u.name`,
+		chatIDs,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer memberRows.Close()
+
+	for memberRows.Next() {
+		var chatID string
+		var m Member
+		if err := memberRows.Scan(&chatID, &m.ID, &m.Name); err != nil {
+			return nil, err
+		}
+		if c, ok := chatsByID[chatID]; ok {
+			c.Members = append(c.Members, m)
+		}
+	}
+
+	return chats, memberRows.Err()
 }
 
 func (s *PostgresStore) UserExists(ctx context.Context, userID string) (bool, error) {
