@@ -3,6 +3,7 @@ package message
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 )
 
@@ -16,10 +17,8 @@ func newFakeStore() *fakeStore {
 }
 
 func (f *fakeStore) IsChatMember(ctx context.Context, chatID, userID string) (bool, error) {
-	for _, id := range f.members[chatID] {
-		if id == userID {
-			return true, nil
-		}
+	if slices.Contains(f.members[chatID], userID) {
+		return true, nil
 	}
 	return false, nil
 }
@@ -50,6 +49,9 @@ func (f *fakeStore) GetMessagesSince(ctx context.Context, chatID string, sinceSe
 	var result []Message
 	for _, m := range f.messages {
 		if m.ChatID == chatID && m.Seq > sinceSeq {
+			if len(result) >= limit {
+				break
+			}
 			result = append(result, m)
 		}
 	}
@@ -121,7 +123,7 @@ func TestGetMessagesSince_ReturnsOnlyNewer(t *testing.T) {
 	svc.SendMessage(ctx, "bob", "chat-1", "second")
 	svc.SendMessage(ctx, "alice", "chat-1", "third")
 
-	messages, err := svc.GetMessagesSince(ctx, "alice", "chat-1", 1)
+	messages, err := svc.GetMessagesSince(ctx, "alice", "chat-1", 1, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -138,7 +140,7 @@ func TestGetMessagesSince_NonMember_Forbidden(t *testing.T) {
 	store.members["chat-1"] = []string{"alice", "bob"}
 	svc := NewService(store)
 
-	_, err := svc.GetMessagesSince(context.Background(), "carol", "chat-1", 0)
+	_, err := svc.GetMessagesSince(context.Background(), "carol", "chat-1", 0, 0)
 	if !errors.Is(err, ErrNotChatMember) {
 		t.Fatalf("expected ErrNotChatMember, got %v", err)
 	}
@@ -153,11 +155,68 @@ func TestGetMessagesSince_SinceZero_ReturnsAll(t *testing.T) {
 	svc.SendMessage(ctx, "alice", "chat-1", "one")
 	svc.SendMessage(ctx, "bob", "chat-1", "two")
 
-	messages, err := svc.GetMessagesSince(ctx, "alice", "chat-1", 0)
+	messages, err := svc.GetMessagesSince(ctx, "alice", "chat-1", 0, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(messages) != 2 {
 		t.Fatalf("expected all 2 messages, got %d", len(messages))
+	}
+}
+
+func TestGetMessagesSince_DefaultLimit_WhenZero(t *testing.T) {
+	store := newFakeStore()
+	store.members["chat-1"] = []string{"alice", "bob"}
+	svc := NewService(store)
+	ctx := context.Background()
+
+	for range 200 {
+		svc.SendMessage(ctx, "alice", "chat-1", "msg")
+	}
+
+	messages, err := svc.GetMessagesSince(ctx, "alice", "chat-1", 0, 0) // limit=0 → default
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(messages) != defaultMessageLimit {
+		t.Fatalf("expected %d messages (default limit), got %d", defaultMessageLimit, len(messages))
+	}
+}
+
+func TestGetMessagesSince_RespectsExplicitLimit(t *testing.T) {
+	store := newFakeStore()
+	store.members["chat-1"] = []string{"alice", "bob"}
+	svc := NewService(store)
+	ctx := context.Background()
+
+	for range 10 {
+		svc.SendMessage(ctx, "alice", "chat-1", "msg")
+	}
+
+	messages, err := svc.GetMessagesSince(ctx, "alice", "chat-1", 0, 3)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(messages) != 3 {
+		t.Fatalf("expected 3 messages, got %d", len(messages))
+	}
+}
+
+func TestGetMessagesSince_ClampsExcessiveLimit(t *testing.T) {
+	store := newFakeStore()
+	store.members["chat-1"] = []string{"alice", "bob"}
+	svc := NewService(store)
+	ctx := context.Background()
+
+	for range 250 {
+		svc.SendMessage(ctx, "alice", "chat-1", "msg")
+	}
+
+	messages, err := svc.GetMessagesSince(ctx, "alice", "chat-1", 0, 999999)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(messages) != maxMessageLimit {
+		t.Fatalf("expected clamped to %d messages, got %d", maxMessageLimit, len(messages))
 	}
 }

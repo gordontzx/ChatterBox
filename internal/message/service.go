@@ -8,6 +8,7 @@ import (
 const (
 	maxContentLength = 4096
 	defaultMessageLimit = 100
+	maxMessageLimit = 200
 )
 
 type Service struct {
@@ -54,7 +55,7 @@ func (s *Service) SendMessage(ctx context.Context, senderID, chatID, content str
 	return &SendResult{Message: *msg, OtherMemberIDs: otherIDs}, nil
 }
 
-func (s *Service) GetMessagesSince(ctx context.Context, callerID, chatID string, sinceSeq int64) ([]Message, error) {
+func (s *Service) GetMessagesSince(ctx context.Context, callerID, chatID string, sinceSeq int64, limit int) ([]Message, error) {
 	isMember, err := s.store.IsChatMember(ctx, chatID, callerID)
 	if err != nil {
 		return nil, err
@@ -63,5 +64,14 @@ func (s *Service) GetMessagesSince(ctx context.Context, callerID, chatID string,
 		return nil, ErrNotChatMember
 	}
 
-	return s.store.GetMessagesSince(ctx, chatID, sinceSeq, defaultMessageLimit)
+	limit = clampLimit(limit)
+
+	return s.store.GetMessagesSince(ctx, chatID, sinceSeq, limit)
+}
+
+func clampLimit(limit int) int {
+	if limit <= 0 {
+		return defaultMessageLimit
+	}
+	return min(limit, maxMessageLimit)
 }
