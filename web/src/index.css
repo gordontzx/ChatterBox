@@ -1,0 +1,117 @@
+:root {
+  --color-bg: #f7f7f8;
+  --color-surface: #ffffff;
+  --color-border: #e2e2e6;
+  --color-text: #17171a;
+  --color-text-muted: #6b6b76;
+  --color-primary: #4f46e5;
+  --color-primary-text: #ffffff;
+  --color-danger: #dc2626;
+  --color-online: #22c55e;
+  --color-offline: #9ca3af;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #131316;
+    --color-surface: #1c1c21;
+    --color-border: #2c2c33;
+    --color-text: #eeeeef;
+    --color-text-muted: #9797a3;
+    --color-primary: #818cf8;
+    --color-primary-text: #131316;
+    --color-danger: #f87171;
+    --color-online: #4ade80;
+    --color-offline: #6b6b76;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--color-primary);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Chat shell: side-by-side list + conversation, stacking to one pane at a
+   time below 640px (list vs. conversation, switched by data-mobile-view —
+   set from the route in ChatsLayout since inline styles can't do media
+   queries). Above the breakpoint both panes always show. */
+.chat-shell {
+  display: flex;
+  height: 100%;
+}
+
+.chat-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.chat-back-link {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .chat-sidebar {
+    width: 100%;
+  }
+
+  .chat-shell[data-mobile-view='list'] .chat-main {
+    display: none;
+  }
+
+  .chat-shell[data-mobile-view='conversation'] .chat-sidebar {
+    display: none;
+  }
+
+  .chat-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 8px;
+    color: var(--color-text);
+    text-decoration: none;
+    font-size: 13px;
+  }
+}
