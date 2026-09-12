@@ -19,9 +19,13 @@ interface MessagesState {
   // unreceived message (?since=<lastSeq>) until a short read. See BE-4
   // decision: no backward pagination — first open pages through everything.
   ensureLoaded: (chatId: string) => Promise<void>
-  // Merges freshly-arrived messages (e.g. from the WS in M3) into a chat
-  // that's already loaded, keyed by id so redelivery can't duplicate them.
+  // Merges a freshly-arrived WS message into a chat's store, keyed by id so
+  // redelivery (e.g. also caught by resync below) can't duplicate it.
   upsertMessage: (chatId: string, message: Message) => void
+  // Backfills a chat that's already loaded after a WS reconnect, paging
+  // forward from its lastSeq. No-ops for chats never opened — those get a
+  // correct full load from ensureLoaded whenever they're opened.
+  resync: (chatId: string) => Promise<void>
 }
 
 function emptyChat(): ChatMessages {
@@ -85,6 +89,33 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
             lastSeq: Math.max(chat.lastSeq, message.seq),
           },
         },
+      }
+    })
+  },
+
+  resync: async (chatId) => {
+    const current = get().chats[chatId]
+    if (!current?.loaded) return
+
+    const updates: Record<string, Message> = {}
+    let since = current.lastSeq
+    let lastSeq = since
+    for (;;) {
+      const page = await fetchMessages(chatId, since, PAGE_LIMIT)
+      for (const m of page) {
+        updates[m.id] = m
+        if (m.seq > lastSeq) lastSeq = m.seq
+      }
+      if (page.length < PAGE_LIMIT) break
+      since = lastSeq
+    }
+    if (Object.keys(updates).length === 0) return
+
+    set((s) => {
+      const chat = s.chats[chatId]
+      if (!chat) return s
+      return {
+        chats: { ...s.chats, [chatId]: { ...chat, byId: { ...chat.byId, ...updates }, lastSeq } },
       }
     })
   },

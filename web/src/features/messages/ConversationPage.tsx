@@ -1,9 +1,11 @@
 import { useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { Button, Input, Spinner } from '../../components/ui'
+import { Spinner } from '../../components/ui'
 import { useAuth } from '../auth/AuthProvider'
 import { useChatsStore } from '../chats/chatStore'
 import { otherMember } from '../chats/utils'
+import { useRealtime } from '../realtime/RealtimeProvider'
+import { Composer } from './Composer'
 import { MessageList } from './MessageList'
 import { selectSortedMessages, useMessagesStore } from './messageStore'
 
@@ -17,6 +19,7 @@ export function ConversationPage() {
 
   const chatMessages = useMessagesStore((s) => (chatId ? s.chats[chatId] : undefined))
   const ensureLoaded = useMessagesStore((s) => s.ensureLoaded)
+  const { status: wsStatus, sendMessage } = useRealtime()
 
   useEffect(() => {
     if (chatId) void ensureLoaded(chatId)
@@ -74,17 +77,7 @@ export function ConversationPage() {
         />
       )}
 
-      <footer
-        style={{
-          borderTop: '1px solid var(--color-border)',
-          padding: 12,
-          display: 'flex',
-          gap: 8,
-        }}
-      >
-        <Input placeholder="Message (sending lands in M3)" disabled style={{ flex: 1 }} />
-        <Button disabled>Send</Button>
-      </footer>
+      <Composer disabled={wsStatus !== 'open'} onSend={(content) => sendMessage(chatId, content)} />
     </>
   )
 }
