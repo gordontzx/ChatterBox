@@ -13,8 +13,12 @@ export interface Member {
   name: string
 }
 
+export type ChatType = 'direct' | 'group'
+
 export interface Chat {
   id: string
+  type: ChatType
+  name?: string // only present for group chats (omitempty on direct ones)
   created_at: string
   members: Member[]
 }

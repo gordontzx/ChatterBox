@@ -19,3 +19,14 @@ export async function searchUserByEmail(email: string): Promise<User | null> {
 export function createDirectChat(otherUserId: string): Promise<Chat> {
   return api.post<Chat>('/chats/direct', { other_user_id: otherUserId })
 }
+
+export function createGroupChat(name: string, memberIds: string[]): Promise<Chat> {
+  return api.post<Chat>('/chats/group', { name, member_ids: memberIds })
+}
+
+// 204 No Content — the caller already has the User it resolved via
+// searchUserByEmail() and should append it to local state itself
+// (chatStore.addMemberLocally); there's no GET /chats/{id} to refetch from.
+export function addMember(chatId: string, userId: string): Promise<void> {
+  return api.post<void>(`/chats/${chatId}/members`, { user_id: userId })
+}

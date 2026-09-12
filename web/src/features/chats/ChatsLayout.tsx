@@ -5,7 +5,7 @@ import { ConnectionStatus } from '../../components/ConnectionStatus'
 import { useAuth } from '../auth/AuthProvider'
 import { useChatsStore } from './chatStore'
 import { NewChatDialog } from './NewChatDialog'
-import { otherMember } from './utils'
+import { chatTitle } from './utils'
 
 export function ChatsLayout() {
   const { user, logout } = useAuth()
@@ -85,7 +85,7 @@ export function ChatsLayout() {
             </p>
           )}
           {chats.map((chat) => {
-            const member = user ? otherMember(chat, user.id) : undefined
+            const title = user ? chatTitle(chat, user.id) : '?'
             return (
               <NavLink
                 key={chat.id}
@@ -101,7 +101,7 @@ export function ChatsLayout() {
                   background: isActive ? 'var(--color-bg)' : 'transparent',
                 })}
               >
-                <Avatar name={member?.name ?? '?'} size={32} />
+                <Avatar name={title} size={32} />
                 <span
                   style={{
                     fontSize: 14,
@@ -110,7 +110,7 @@ export function ChatsLayout() {
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {member?.name ?? 'Unknown'}
+                  {title}
                 </span>
               </NavLink>
             )

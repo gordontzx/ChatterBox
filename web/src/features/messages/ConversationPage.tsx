@@ -1,9 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Spinner } from '../../components/ui'
+import { Button, Spinner } from '../../components/ui'
 import { useAuth } from '../auth/AuthProvider'
+import { AddMemberDialog } from '../chats/AddMemberDialog'
 import { useChatsStore } from '../chats/chatStore'
-import { otherMember } from '../chats/utils'
+import { GroupMembersDialog } from '../chats/GroupMembersDialog'
+import { chatTitle } from '../chats/utils'
 import { useRealtime } from '../realtime/RealtimeProvider'
 import { Composer } from './Composer'
 import { MessageList } from './MessageList'
@@ -20,6 +22,8 @@ export function ConversationPage() {
   const chatMessages = useMessagesStore((s) => (chatId ? s.chats[chatId] : undefined))
   const ensureLoaded = useMessagesStore((s) => s.ensureLoaded)
   const { status: wsStatus, sendMessage } = useRealtime()
+  const [addMemberOpen, setAddMemberOpen] = useState(false)
+  const [membersOpen, setMembersOpen] = useState(false)
 
   useEffect(() => {
     if (chatId) void ensureLoaded(chatId)
@@ -30,11 +34,7 @@ export function ConversationPage() {
   const messages = selectSortedMessages(chatMessages)
   const memberNames = new Map(chat?.members.map((m) => [m.id, m.name]))
 
-  const title = chat
-    ? otherMember(chat, user.id)?.name
-    : chatsLoaded
-      ? 'Chat not found'
-      : 'Loading…'
+  const title = chat ? chatTitle(chat, user.id) : chatsLoaded ? 'Chat not found' : 'Loading…'
 
   return (
     <>
@@ -42,16 +42,53 @@ export function ConversationPage() {
         style={{
           padding: '12px 16px',
           borderBottom: '1px solid var(--color-border)',
-          fontWeight: 600,
-          fontSize: 14,
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
         }}
       >
-        <Link to="/" className="chat-back-link">
-          ← Back
-        </Link>
-        {title}
+        <div style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+          <Link to="/" className="chat-back-link">
+            ← Back
+          </Link>
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontWeight: 600,
+                fontSize: 14,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {title}
+            </div>
+            {chat?.type === 'group' && (
+              <button
+                type="button"
+                onClick={() => setMembersOpen(true)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  font: 'inherit',
+                  fontSize: 12,
+                  color: 'var(--color-text-muted)',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                }}
+              >
+                {chat.members.length} members
+              </button>
+            )}
+          </div>
+        </div>
+        {chat?.type === 'group' && (
+          <Button variant="secondary" onClick={() => setAddMemberOpen(true)}>
+            + Add
+          </Button>
+        )}
       </header>
 
       {chatMessages?.loading && messages.length === 0 ? (
@@ -88,6 +125,21 @@ export function ConversationPage() {
         disabled={wsStatus !== 'open'}
         onSend={(content) => sendMessage(chatId, content)}
       />
+
+      {chat?.type === 'group' && (
+        <>
+          <AddMemberDialog
+            open={addMemberOpen}
+            onClose={() => setAddMemberOpen(false)}
+            chat={chat}
+          />
+          <GroupMembersDialog
+            open={membersOpen}
+            onClose={() => setMembersOpen(false)}
+            chat={chat}
+          />
+        </>
+      )}
     </>
   )
 }
