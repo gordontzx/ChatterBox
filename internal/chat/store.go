@@ -13,6 +13,7 @@ type Store interface {
 	CreateDirectChat(ctx context.Context, user1, user2 string) (*Chat, error)
 	CreateGroupChat(ctx context.Context, name string, memberIDs []string) (*Chat, error)
 	AddMember(ctx context.Context, chatID, userID string) error
+	RemoveMember(ctx context.Context, chatID, userID string) error
 	GetChat(ctx context.Context, chatID string) (*Chat, error)
 	ListChatsForUser(ctx context.Context, userID string) ([]*Chat, error)
 	IsChatMember(ctx context.Context, chatID, userID string) (bool, error)
@@ -124,6 +125,15 @@ func (s *PostgresStore) AddMember(ctx context.Context, chatID, userID string) er
 	_, err := s.pool.Exec(ctx,
 		`INSERT into chat_members (chat_id, user_id) VALUES ($1, $2)
 		 ON CONFLICT (chat_id, user_id) DO NOTHING`,
+		chatID, userID,
+	)
+	return err
+}
+
+func (s *PostgresStore) RemoveMember(ctx context.Context, chatID, userID string) error {
+	_, err := s.pool.Exec(ctx,
+		`DELETE FROM chat_members
+		 WHERE chat_id = $1 AND user_id = $2`,
 		chatID, userID,
 	)
 	return err

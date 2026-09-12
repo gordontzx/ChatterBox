@@ -67,6 +67,7 @@ func main() {
 	mux.Handle("POST /chats/direct", requireAuth(http.HandlerFunc(chatHandler.CreateDirect)))
 	mux.Handle("POST /chats/group", requireAuth(http.HandlerFunc(chatHandler.CreateGroup)))
 	mux.Handle("POST /chats/{chatID}/members", requireAuth(http.HandlerFunc(chatHandler.AddMember)))
+	mux.Handle("POST /chats/{chatID}/leave", requireAuth(http.HandlerFunc(chatHandler.Leave)))
 	mux.Handle("GET /chats", requireAuth(http.HandlerFunc(chatHandler.List)))
 
 	mux.Handle("GET /chats/{chatID}/messages", requireAuth(http.HandlerFunc(msgHandler.GetMessages)))

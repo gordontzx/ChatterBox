@@ -78,8 +78,20 @@ func (h *Handler) AddMember(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// POST /chats/{chatID}/leave (protected route)
+func (h *Handler) Leave(w http.ResponseWriter, r *http.Request) {
+	callerID := middleware.UserIDFromContext(r.Context())
+	chatID := r.PathValue("chatID")
 
-// GET chats (protected route)
+	if err := h.svc.LeaveChat(r.Context(), callerID, chatID); err != nil {
+		writeChatError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// GET /chats (protected route)
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	callerID := middleware.UserIDFromContext(r.Context())
 

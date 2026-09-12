@@ -77,24 +77,33 @@ func (s *Service) CreateGroupChat(ctx context.Context, callerID string, req Crea
 	return s.store.CreateGroupChat(ctx, name, allMembers)
 }
 
-func (s *Service) AddMember(ctx context.Context, callerID, chatID, userID string) error {
+func (s *Service) GetChat(ctx context.Context, callerID, chatID string) (*Chat, error) {
 	chat, err := s.store.GetChat(ctx, chatID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if chat == nil {
-		return ErrChatNotFound
-	}
-	if chat.Type != ChatTypeGroup {
-		return ErrNotGroupChat
+		return nil, ErrChatNotFound
 	}
 
 	isMember, err := s.store.IsChatMember(ctx, chatID, callerID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !isMember {
-		return ErrNotChatMember
+		return nil, ErrNotChatMember
+	}
+
+	return chat, nil
+}
+
+func (s *Service) AddMember(ctx context.Context, callerID, chatID, userID string) error {
+	chat, err := s.GetChat(ctx, callerID, chatID)
+	if err != nil {
+		return err
+	}
+	if chat.Type != ChatTypeGroup {
+		return ErrNotGroupChat
 	}
 
 	exists, err := s.store.UserExists(ctx, userID)
@@ -114,4 +123,28 @@ func (s *Service) AddMember(ctx context.Context, callerID, chatID, userID string
 	}
 
 	return s.store.AddMember(ctx, chatID, userID)
+}
+
+func (s *Service) RemoveMember(ctx context.Context, callerID, chatID, targetUserID string) error {
+	chat, err := s.GetChat(ctx, callerID, chatID)
+	if err != nil {
+		return err
+	}
+	if chat.Type != ChatTypeGroup {
+		return ErrNotGroupChat
+	}
+
+	exists, err := s.store.UserExists(ctx, targetUserID)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return ErrUserNotFound
+	}
+
+	return s.store.RemoveMember(ctx, chatID, targetUserID)
+}
+
+func (s *Service) LeaveChat(ctx context.Context, callerID, chatID string) error {
+	return s.RemoveMember(ctx, callerID, chatID, callerID)
 }
