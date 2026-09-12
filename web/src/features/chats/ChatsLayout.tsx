@@ -1,12 +1,18 @@
-import { Outlet } from 'react-router-dom'
-import { Avatar, Button } from '../../components/ui'
+import { useEffect } from 'react'
+import { NavLink, Outlet } from 'react-router-dom'
+import { Avatar, Button, Spinner } from '../../components/ui'
 import { ConnectionStatus } from '../../components/ConnectionStatus'
 import { useAuth } from '../auth/AuthProvider'
+import { useChatsStore } from './chatStore'
+import { otherMember } from './utils'
 
-// Real chat list lands in M2 (GET /chats). This is the M0/M1 shell: sidebar
-// layout + placeholder rows, now with the real logged-in user.
 export function ChatsLayout() {
   const { user, logout } = useAuth()
+  const { chats, loading, loaded, error, loadChats } = useChatsStore()
+
+  useEffect(() => {
+    if (!loaded && !loading) void loadChats()
+  }, [loaded, loading, loadChats])
 
   return (
     <div style={{ display: 'flex', height: '100%' }}>
@@ -55,8 +61,51 @@ export function ChatsLayout() {
             </Button>
           </div>
         </header>
-        <div style={{ flex: 1, overflowY: 'auto', padding: 8, color: 'var(--color-text-muted)' }}>
-          <p style={{ fontSize: 13, padding: '8px 8px' }}>No chats yet.</p>
+        <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
+          {loading && !loaded && (
+            <div style={{ display: 'grid', placeItems: 'center', padding: 24 }}>
+              <Spinner />
+            </div>
+          )}
+          {error && (
+            <p style={{ padding: 8, fontSize: 13, color: 'var(--color-danger)' }}>{error}</p>
+          )}
+          {loaded && chats.length === 0 && (
+            <p style={{ padding: 8, fontSize: 13, color: 'var(--color-text-muted)' }}>
+              No chats yet.
+            </p>
+          )}
+          {chats.map((chat) => {
+            const member = user ? otherMember(chat, user.id) : undefined
+            return (
+              <NavLink
+                key={chat.id}
+                to={`/chats/${chat.id}`}
+                style={({ isActive }) => ({
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px',
+                  borderRadius: 'var(--radius-sm)',
+                  textDecoration: 'none',
+                  color: 'var(--color-text)',
+                  background: isActive ? 'var(--color-bg)' : 'transparent',
+                })}
+              >
+                <Avatar name={member?.name ?? '?'} size={32} />
+                <span
+                  style={{
+                    fontSize: 14,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {member?.name ?? 'Unknown'}
+                </span>
+              </NavLink>
+            )
+          })}
         </div>
       </aside>
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
