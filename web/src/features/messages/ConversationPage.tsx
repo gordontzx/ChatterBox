@@ -76,7 +76,7 @@ export function ConversationPage() {
         </div>
       ) : (
         <MessageList
-          key={chatId}
+          key={`messages-${chatId}`}
           messages={messages}
           selfId={user.id}
           senderName={(id) => memberNames.get(id) ?? '?'}
@@ -84,7 +84,7 @@ export function ConversationPage() {
       )}
 
       <Composer
-        key={chatId}
+        key={`composer-${chatId}`}
         disabled={wsStatus !== 'open'}
         onSend={(content) => sendMessage(chatId, content)}
       />

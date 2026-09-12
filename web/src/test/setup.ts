@@ -1,8 +1,10 @@
-// Node has no global `localStorage` (its experimental Web Storage API isn't
-// enabled here, and isn't worth depending on for tests anyway — it can
-// persist to disk). lib/tokens.ts wraps every access in try/catch, so
-// without this it would silently degrade to "storage unavailable"; this
-// polyfill makes refresh-token persistence actually testable.
+// Plain Node (our default 'node' test environment) has no global
+// `localStorage` at all, so without this, lib/tokens.ts would silently
+// degrade to "storage unavailable" (it wraps every access in try/catch) and
+// refresh-token persistence would be untestable. A jsdom-environment test
+// file (`// @vitest-environment jsdom`) already gets a real one from jsdom
+// as a getter-only property on Window, which we must NOT clobber — hence
+// the probe below rather than an unconditional assignment.
 class MemoryStorage implements Storage {
   private store = new Map<string, string>()
 
@@ -31,4 +33,20 @@ class MemoryStorage implements Storage {
   }
 }
 
-globalThis.localStorage = new MemoryStorage()
+function localStorageWorks(): boolean {
+  try {
+    globalThis.localStorage.setItem('__probe__', '1')
+    globalThis.localStorage.removeItem('__probe__')
+    return true
+  } catch {
+    return false
+  }
+}
+
+if (!localStorageWorks()) {
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: new MemoryStorage(),
+    writable: true,
+    configurable: true,
+  })
+}

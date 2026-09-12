@@ -51,7 +51,7 @@ export function MessageList({ messages, selfId, senderName }: MessageListProps) 
   }
 
   return (
-    <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
+    <div data-testid="message-list" style={{ position: 'relative', flex: 1, minHeight: 0 }}>
       <div
         ref={containerRef}
         onScroll={handleScroll}
