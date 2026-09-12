@@ -3,7 +3,7 @@ import { ApiError } from '../../lib/apiClient'
 import type { Message } from '../../types'
 import { fetchMessages } from './api'
 
-const PAGE_LIMIT = 100
+export const PAGE_LIMIT = 100
 
 export interface ChatMessages {
   byId: Record<string, Message>
