@@ -34,7 +34,7 @@ func (s *PostgresStore) FindDirectChat(ctx context.Context, user1, user2 string)
 		`SELECT c.id
 		 FROM chats c
 		 WHERE c.chat_type = 'direct'
-		 WHERE c.id IN (
+		 AND c.id IN (
 			 SELECT chat_id FROM chat_members WHERE user_id = $1
 			 INTERSECT
 			 SELECT chat_id FROM chat_members WHERE user_id = $2
@@ -138,7 +138,7 @@ func (s *PostgresStore) IsChatMember(ctx context.Context, chatID, userID string)
 	return exists, err
 }
 
-func (s* PostgresStore) GetChat(ctx context.Context, chatID string) (*Chat, error) {
+func (s *PostgresStore) GetChat(ctx context.Context, chatID string) (*Chat, error) {
 	var c Chat
 	var chatType string
 	err := s.pool.QueryRow(ctx,
