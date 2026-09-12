@@ -10,7 +10,20 @@ import {
 import { refreshAccessToken } from '../../lib/apiClient'
 import { clearTokens, getRefreshToken, setAccessToken, setRefreshToken } from '../../lib/tokens'
 import type { User } from '../../types'
+import { useChatsStore } from '../chats/chatStore'
+import { useMessagesStore } from '../messages/messageStore'
 import { fetchMe, login as loginRequest, logout as logoutRequest, registerUser } from './api'
+
+// chatStore/messageStore are module-level singletons that outlive any one
+// user's session. Without this, signing out and a different account signing
+// in in the same tab would keep showing the previous account's chats and
+// messages until something happened to trigger a refetch — they're keyed by
+// chat id, not by user, so nothing about a new login naturally clears them.
+function clearSessionState() {
+  clearTokens()
+  useChatsStore.getState().reset()
+  useMessagesStore.getState().reset()
+}
 
 // Keeps the access token from ever expiring mid-session (it's good for 15
 // min server-side) so a WS reconnect always has a fresh one to dial with.
@@ -48,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         if (cancelled) return
-        clearTokens()
+        clearSessionState()
         setStatus('anon')
       })
 
@@ -62,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const id = setInterval(() => {
       refreshAccessToken().catch(() => {
-        clearTokens()
+        clearSessionState()
         setUser(null)
         setStatus('anon')
       })
@@ -90,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     const refreshToken = getRefreshToken()
-    clearTokens()
+    clearSessionState()
     setUser(null)
     setStatus('anon')
     if (refreshToken) {

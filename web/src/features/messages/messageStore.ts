@@ -26,6 +26,10 @@ interface MessagesState {
   // forward from its lastSeq. No-ops for chats never opened — those get a
   // correct full load from ensureLoaded whenever they're opened.
   resync: (chatId: string) => Promise<void>
+  // Clears everything. Must run on logout/forced sign-out for the same
+  // reason as chatStore.reset() — and more sensitive here, since this is
+  // private message content, not just chat metadata.
+  reset: () => void
 }
 
 function emptyChat(): ChatMessages {
@@ -119,6 +123,8 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
       }
     })
   },
+
+  reset: () => set({ chats: {} }),
 }))
 
 export function selectSortedMessages(state: ChatMessages | undefined): Message[] {

@@ -12,6 +12,12 @@ interface ChatsState {
   // Inserts a newly-created chat (or updates it if POST /chats/direct
   // returned an existing one) without a full reload.
   addChat: (chat: Chat) => void
+  // Clears everything. Must run on logout (and on a forced sign-out) — this
+  // store is a module-level singleton that outlives any one user's session,
+  // so without this a second account signing in in the same tab would see
+  // the previous account's chats until something happened to trigger a
+  // refetch.
+  reset: () => void
 }
 
 export const useChatsStore = create<ChatsState>((set, get) => ({
@@ -37,4 +43,5 @@ export const useChatsStore = create<ChatsState>((set, get) => ({
       }
     })
   },
+  reset: () => set({ chats: [], loading: false, loaded: false, error: null }),
 }))
