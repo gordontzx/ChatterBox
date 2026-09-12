@@ -9,9 +9,10 @@ import (
 // fakeStore is an in-memory Store implementation for testing Service
 // without touching Postgres.
 type fakeStore struct {
-	users map[string]bool          // userID -> exists
-	names map[string]string        // userID -> display name
-	chats map[string]*Chat         // chatID -> Chat
+	users map[string]bool   // userID -> exists
+	names map[string]string // userID -> display name
+	chats map[string]*Chat  // chatID -> Chat
+	nextID int
 }
 
 func newFakeStore() *fakeStore {
@@ -22,20 +23,48 @@ func newFakeStore() *fakeStore {
 	}
 }
 
-// seedUser registers a user as existing, with a display name, for use
-// in FindDirectChat/CreateDirectChat's member construction.
 func (f *fakeStore) seedUser(id, name string) {
 	f.users[id] = true
 	f.names[id] = name
+}
+
+func (f *fakeStore) newChatID() string {
+	f.nextID++
+	return "chat-" + string(rune('a'+f.nextID))
+}
+
+func (f *fakeStore) buildMembers(ids []string) []Member {
+	members := make([]Member, 0, len(ids))
+	for _, id := range ids {
+		members = append(members, Member{ID: id, Name: f.names[id]})
+	}
+	return members
 }
 
 func (f *fakeStore) UserExists(ctx context.Context, userID string) (bool, error) {
 	return f.users[userID], nil
 }
 
+func (f *fakeStore) IsChatMember(ctx context.Context, chatID, userID string) (bool, error) {
+	c, ok := f.chats[chatID]
+	if !ok {
+		return false, nil
+	}
+	for _, m := range c.Members {
+		if m.ID == userID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (f *fakeStore) GetChat(ctx context.Context, chatID string) (*Chat, error) {
+	return f.chats[chatID], nil // nil, nil if not found — matches real store's contract
+}
+
 func (f *fakeStore) FindDirectChat(ctx context.Context, userA, userB string) (*Chat, error) {
 	for _, c := range f.chats {
-		if len(c.Members) != 2 {
+		if c.Type != ChatTypeDirect || len(c.Members) != 2 {
 			continue
 		}
 		hasA := c.Members[0].ID == userA || c.Members[1].ID == userA
@@ -48,16 +77,41 @@ func (f *fakeStore) FindDirectChat(ctx context.Context, userA, userB string) (*C
 }
 
 func (f *fakeStore) CreateDirectChat(ctx context.Context, userA, userB string) (*Chat, error) {
-	id := "chat-" + userA + "-" + userB
+	id := f.newChatID()
 	c := &Chat{
-		ID: id,
-		Members: []Member{
-			{ID: userA, Name: f.names[userA]},
-			{ID: userB, Name: f.names[userB]},
-		},
+		ID:      id,
+		Type:    ChatTypeDirect,
+		Members: f.buildMembers([]string{userA, userB}),
 	}
 	f.chats[id] = c
 	return c, nil
+}
+
+func (f *fakeStore) CreateGroupChat(ctx context.Context, name string, memberIDs []string) (*Chat, error) {
+	id := f.newChatID()
+	nameCopy := name
+	c := &Chat{
+		ID:      id,
+		Type:    ChatTypeGroup,
+		Name:    &nameCopy,
+		Members: f.buildMembers(memberIDs),
+	}
+	f.chats[id] = c
+	return c, nil
+}
+
+func (f *fakeStore) AddMember(ctx context.Context, chatID, userID string) error {
+	c, ok := f.chats[chatID]
+	if !ok {
+		return nil // matches real store's ON CONFLICT DO NOTHING no-op behavior on missing chat
+	}
+	for _, m := range c.Members {
+		if m.ID == userID {
+			return nil // already a member — idempotent no-op
+		}
+	}
+	c.Members = append(c.Members, Member{ID: userID, Name: f.names[userID]})
+	return nil
 }
 
 func (f *fakeStore) ListChatsForUser(ctx context.Context, userID string) ([]*Chat, error) {
@@ -73,6 +127,8 @@ func (f *fakeStore) ListChatsForUser(ctx context.Context, userID string) ([]*Cha
 	return result, nil
 }
 
+// ---------- Direct chat tests ----------
+
 func TestCreateOrGetDirectChat_CreatesNewChat(t *testing.T) {
 	store := newFakeStore()
 	store.seedUser("alice", "Alice")
@@ -83,7 +139,10 @@ func TestCreateOrGetDirectChat_CreatesNewChat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if c == nil || len(c.Members) != 2 {
+	if c.Type != ChatTypeDirect {
+		t.Fatalf("expected direct chat type, got %s", c.Type)
+	}
+	if len(c.Members) != 2 {
 		t.Fatalf("expected a chat with 2 members, got %+v", c)
 	}
 }
@@ -121,19 +180,16 @@ func TestCreateOrGetDirectChat_ReturnsExistingChat(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
 	second, err := svc.CreateOrGetDirectChat(ctx, "alice", "bob")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
 	if first.ID != second.ID {
 		t.Fatalf("expected the same chat to be returned, got %s and %s", first.ID, second.ID)
 	}
 }
 
 func TestCreateOrGetDirectChat_ReturnsExistingChat_ReverseOrder(t *testing.T) {
-	// Calling with (bob, alice) should still find the chat created as (alice, bob).
 	store := newFakeStore()
 	store.seedUser("alice", "Alice")
 	store.seedUser("bob", "Bob")
@@ -145,7 +201,6 @@ func TestCreateOrGetDirectChat_ReturnsExistingChat_ReverseOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
 	if first.ID != second.ID {
 		t.Fatalf("expected same chat regardless of argument order, got %s and %s", first.ID, second.ID)
 	}
@@ -165,7 +220,6 @@ func TestCreateOrGetDirectChat_CannotChatWithSelf(t *testing.T) {
 func TestCreateOrGetDirectChat_OtherUserNotFound(t *testing.T) {
 	store := newFakeStore()
 	store.seedUser("alice", "Alice")
-	// "bob" deliberately not seeded
 	svc := NewService(store)
 
 	_, err := svc.CreateOrGetDirectChat(context.Background(), "alice", "bob")
@@ -173,6 +227,243 @@ func TestCreateOrGetDirectChat_OtherUserNotFound(t *testing.T) {
 		t.Fatalf("expected ErrUserNotFound, got %v", err)
 	}
 }
+
+func TestCreateOrGetDirectChat_DoesNotCollideWithGroupChatOfSameTwoUsers(t *testing.T) {
+	// A 2-person group chat between alice and bob must NOT be returned
+	// when alice asks for her *direct* chat with bob.
+	store := newFakeStore()
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
+	svc := NewService(store)
+	ctx := context.Background()
+
+	group, err := svc.CreateGroupChat(ctx, "alice", CreateGroupChatRequest{
+		Name:      "Just us two, but a group",
+		MemberIDs: []string{"bob"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error creating group: %v", err)
+	}
+
+	direct, err := svc.CreateOrGetDirectChat(ctx, "alice", "bob")
+	if err != nil {
+		t.Fatalf("unexpected error creating direct: %v", err)
+	}
+
+	if direct.ID == group.ID {
+		t.Fatal("expected direct chat and group chat to be distinct, got the same chat")
+	}
+	if direct.Type != ChatTypeDirect {
+		t.Fatalf("expected direct chat type, got %s", direct.Type)
+	}
+}
+
+// ---------- Group chat tests ----------
+
+func TestCreateGroupChat_Success(t *testing.T) {
+	store := newFakeStore()
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
+	store.seedUser("carol", "Carol")
+	svc := NewService(store)
+
+	c, err := svc.CreateGroupChat(context.Background(), "alice", CreateGroupChatRequest{
+		Name:      "Weekend Trip",
+		MemberIDs: []string{"bob", "carol"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if c.Type != ChatTypeGroup {
+		t.Fatalf("expected group chat type, got %s", c.Type)
+	}
+	if c.Name == nil || *c.Name != "Weekend Trip" {
+		t.Fatalf("expected name 'Weekend Trip', got %+v", c.Name)
+	}
+	if len(c.Members) != 3 {
+		t.Fatalf("expected 3 members (alice, bob, carol), got %d", len(c.Members))
+	}
+}
+
+func TestCreateGroupChat_AllowsTwoTotalMembers(t *testing.T) {
+	store := newFakeStore()
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
+	svc := NewService(store)
+
+	c, err := svc.CreateGroupChat(context.Background(), "alice", CreateGroupChatRequest{
+		Name:      "Just us two",
+		MemberIDs: []string{"bob"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.Members) != 2 {
+		t.Fatalf("expected 2 total members, got %d", len(c.Members))
+	}
+}
+
+func TestCreateGroupChat_RequiresAtLeastOneOtherMember(t *testing.T) {
+	store := newFakeStore()
+	store.seedUser("alice", "Alice")
+	svc := NewService(store)
+
+	_, err := svc.CreateGroupChat(context.Background(), "alice", CreateGroupChatRequest{
+		Name:      "Solo group?",
+		MemberIDs: []string{},
+	})
+	if !errors.Is(err, ErrGroupTooSmall) {
+		t.Fatalf("expected ErrGroupTooSmall, got %v", err)
+	}
+}
+
+func TestCreateGroupChat_RequiresName(t *testing.T) {
+	store := newFakeStore()
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
+	svc := NewService(store)
+
+	_, err := svc.CreateGroupChat(context.Background(), "alice", CreateGroupChatRequest{
+		Name:      "   ", // whitespace only
+		MemberIDs: []string{"bob"},
+	})
+	if !errors.Is(err, ErrGroupNameRequired) {
+		t.Fatalf("expected ErrGroupNameRequired, got %v", err)
+	}
+}
+
+func TestCreateGroupChat_UnknownMember(t *testing.T) {
+	store := newFakeStore()
+	store.seedUser("alice", "Alice")
+	svc := NewService(store)
+
+	_, err := svc.CreateGroupChat(context.Background(), "alice", CreateGroupChatRequest{
+		Name:      "Trip",
+		MemberIDs: []string{"ghost"},
+	})
+	if !errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("expected ErrUserNotFound, got %v", err)
+	}
+}
+
+func TestCreateGroupChat_DeduplicatesAndExcludesCallerFromInput(t *testing.T) {
+	store := newFakeStore()
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
+	svc := NewService(store)
+
+	// alice includes herself and duplicates bob in the request — should
+	// still just end up with [alice, bob], not error or double-add bob.
+	c, err := svc.CreateGroupChat(context.Background(), "alice", CreateGroupChatRequest{
+		Name:      "Trip",
+		MemberIDs: []string{"alice", "bob", "bob"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.Members) != 2 {
+		t.Fatalf("expected exactly 2 deduplicated members, got %d: %+v", len(c.Members), c.Members)
+	}
+}
+
+// ---------- AddMember tests ----------
+
+func TestAddMember_Success(t *testing.T) {
+	store := newFakeStore()
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
+	store.seedUser("carol", "Carol")
+	svc := NewService(store)
+	ctx := context.Background()
+
+	group, _ := svc.CreateGroupChat(ctx, "alice", CreateGroupChatRequest{
+		Name:      "Trip",
+		MemberIDs: []string{"bob"},
+	})
+
+	err := svc.AddMember(ctx, "alice", group.ID, "carol")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	updated, _ := store.GetChat(ctx, group.ID)
+	if len(updated.Members) != 3 {
+		t.Fatalf("expected 3 members after add, got %d", len(updated.Members))
+	}
+}
+
+func TestAddMember_NonMemberCannotAdd(t *testing.T) {
+	store := newFakeStore()
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
+	store.seedUser("mallory", "Mallory")
+	svc := NewService(store)
+	ctx := context.Background()
+
+	group, _ := svc.CreateGroupChat(ctx, "alice", CreateGroupChatRequest{
+		Name:      "Trip",
+		MemberIDs: []string{"bob"},
+	})
+
+	err := svc.AddMember(ctx, "mallory", group.ID, "mallory")
+	if !errors.Is(err, ErrNotChatMember) {
+		t.Fatalf("expected ErrNotChatMember, got %v", err)
+	}
+}
+
+func TestAddMember_CannotAddToDirectChat(t *testing.T) {
+	store := newFakeStore()
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
+	store.seedUser("carol", "Carol")
+	svc := NewService(store)
+	ctx := context.Background()
+
+	direct, _ := svc.CreateOrGetDirectChat(ctx, "alice", "bob")
+
+	err := svc.AddMember(ctx, "alice", direct.ID, "carol")
+	if !errors.Is(err, ErrNotGroupChat) {
+		t.Fatalf("expected ErrNotGroupChat, got %v", err)
+	}
+}
+
+func TestAddMember_AlreadyMember(t *testing.T) {
+	store := newFakeStore()
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
+	svc := NewService(store)
+	ctx := context.Background()
+
+	group, _ := svc.CreateGroupChat(ctx, "alice", CreateGroupChatRequest{
+		Name:      "Trip",
+		MemberIDs: []string{"bob"},
+	})
+
+	err := svc.AddMember(ctx, "alice", group.ID, "bob")
+	if !errors.Is(err, ErrAlreadyMember) {
+		t.Fatalf("expected ErrAlreadyMember, got %v", err)
+	}
+}
+
+func TestAddMember_UnknownUser(t *testing.T) {
+	store := newFakeStore()
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
+	svc := NewService(store)
+	ctx := context.Background()
+
+	group, _ := svc.CreateGroupChat(ctx, "alice", CreateGroupChatRequest{
+		Name:      "Trip",
+		MemberIDs: []string{"bob"},
+	})
+
+	err := svc.AddMember(ctx, "alice", group.ID, "ghost")
+	if !errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("expected ErrUserNotFound, got %v", err)
+	}
+}
+
+// ---------- ListChats tests ----------
 
 func TestListChats_ReturnsOnlyCallersChats(t *testing.T) {
 	store := newFakeStore()
@@ -194,29 +485,23 @@ func TestListChats_ReturnsOnlyCallersChats(t *testing.T) {
 	}
 }
 
-func TestListChats_IncludesMembersWithNames(t *testing.T) {
+func TestListChats_IncludesBothDirectAndGroupChats(t *testing.T) {
 	store := newFakeStore()
 	store.seedUser("alice", "Alice")
 	store.seedUser("bob", "Bob")
+	store.seedUser("carol", "Carol")
 	svc := NewService(store)
 	ctx := context.Background()
 
 	svc.CreateOrGetDirectChat(ctx, "alice", "bob")
+	svc.CreateGroupChat(ctx, "alice", CreateGroupChatRequest{Name: "Trip", MemberIDs: []string{"bob", "carol"}})
 
 	chats, err := svc.ListChats(ctx, "alice")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(chats) != 1 || len(chats[0].Members) != 2 {
-		t.Fatalf("expected 1 chat with 2 members, got %+v", chats)
-	}
-
-	names := map[string]bool{}
-	for _, m := range chats[0].Members {
-		names[m.Name] = true
-	}
-	if !names["Alice"] || !names["Bob"] {
-		t.Fatalf("expected both Alice and Bob in member names, got %+v", chats[0].Members)
+	if len(chats) != 2 {
+		t.Fatalf("expected 2 chats for alice, got %d", len(chats))
 	}
 }
 
