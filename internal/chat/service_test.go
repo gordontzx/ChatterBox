@@ -114,6 +114,21 @@ func (f *fakeStore) AddMember(ctx context.Context, chatID, userID string) error 
 	return nil
 }
 
+func (f *fakeStore) RemoveMember(ctx context.Context, chatID, userID string) error {
+	c, ok := f.chats[chatID]
+	if !ok {
+		return nil
+	}
+	var filtered []Member
+	for _, m := range c.Members {
+		if m.ID != userID {
+			filtered = append(filtered, m)
+		}
+	}
+	c.Members = filtered
+	return nil
+}
+
 func (f *fakeStore) ListChatsForUser(ctx context.Context, userID string) ([]*Chat, error) {
 	var result []*Chat
 	for _, c := range f.chats {
@@ -515,5 +530,39 @@ func TestListChats_NoChats_ReturnsEmpty(t *testing.T) {
 	}
 	if len(chats) != 0 {
 		t.Fatalf("expected no chats, got %d", len(chats))
+	}
+}
+
+func TestLeaveChat_CannotLeaveDirectChat(t *testing.T) {
+	store := newFakeStore()
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
+	svc := NewService(store)
+	ctx := context.Background()
+
+	direct, _ := svc.CreateOrGetDirectChat(ctx, "alice", "bob")
+
+	err := svc.LeaveChat(ctx, "alice", direct.ID)
+	if !errors.Is(err, ErrNotGroupChat) {
+		t.Fatalf("expected ErrNotGroupChat, got %v", err)
+	}
+}
+
+func TestLeaveChat_NonMemberCannotLeave(t *testing.T) {
+	store := newFakeStore()
+	store.seedUser("alice", "Alice")
+	store.seedUser("bob", "Bob")
+	store.seedUser("mallory", "Mallory")
+	svc := NewService(store)
+	ctx := context.Background()
+
+	group, _ := svc.CreateGroupChat(ctx, "alice", CreateGroupChatRequest{
+		Name:      "Trip",
+		MemberIDs: []string{"bob"},
+	})
+
+	err := svc.LeaveChat(ctx, "mallory", group.ID)
+	if !errors.Is(err, ErrNotChatMember) {
+		t.Fatalf("expected ErrNotChatMember, got %v", err)
 	}
 }

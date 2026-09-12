@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { AddMemberDialog } from '../chats/AddMemberDialog'
 import { useChatsStore } from '../chats/chatStore'
 import { GroupMembersDialog } from '../chats/GroupMembersDialog'
+import { LeaveChatDialog } from '../chats/LeaveChatDialog'
 import { chatTitle } from '../chats/utils'
 import { useRealtime } from '../realtime/RealtimeProvider'
 import { Composer } from './Composer'
@@ -24,6 +25,7 @@ export function ConversationPage() {
   const { status: wsStatus, sendMessage } = useRealtime()
   const [addMemberOpen, setAddMemberOpen] = useState(false)
   const [membersOpen, setMembersOpen] = useState(false)
+  const [leaveOpen, setLeaveOpen] = useState(false)
 
   useEffect(() => {
     if (chatId) void ensureLoaded(chatId)
@@ -85,9 +87,14 @@ export function ConversationPage() {
           </div>
         </div>
         {chat?.type === 'group' && (
-          <Button variant="secondary" onClick={() => setAddMemberOpen(true)}>
-            + Add
-          </Button>
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            <Button variant="secondary" onClick={() => setAddMemberOpen(true)}>
+              + Add
+            </Button>
+            <Button variant="ghost" onClick={() => setLeaveOpen(true)}>
+              Leave
+            </Button>
+          </div>
         )}
       </header>
 
@@ -138,6 +145,7 @@ export function ConversationPage() {
             onClose={() => setMembersOpen(false)}
             chat={chat}
           />
+          <LeaveChatDialog open={leaveOpen} onClose={() => setLeaveOpen(false)} chat={chat} />
         </>
       )}
     </>

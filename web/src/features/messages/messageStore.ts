@@ -26,6 +26,10 @@ interface MessagesState {
   // forward from its lastSeq. No-ops for chats never opened — those get a
   // correct full load from ensureLoaded whenever they're opened.
   resync: (chatId: string) => Promise<void>
+  // Drops one chat's cached messages — call this after leaving it so a
+  // long session doesn't keep accumulating message data for chats you're
+  // no longer even in.
+  removeChat: (chatId: string) => void
   // Clears everything. Must run on logout/forced sign-out for the same
   // reason as chatStore.reset() — and more sensitive here, since this is
   // private message content, not just chat metadata.
@@ -121,6 +125,14 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
       return {
         chats: { ...s.chats, [chatId]: { ...chat, byId: { ...chat.byId, ...updates }, lastSeq } },
       }
+    })
+  },
+
+  removeChat: (chatId) => {
+    set((s) => {
+      if (!(chatId in s.chats)) return s
+      const { [chatId]: _removed, ...rest } = s.chats
+      return { chats: rest }
     })
   },
 

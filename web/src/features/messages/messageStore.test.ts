@@ -95,6 +95,17 @@ describe('messagesStore', () => {
     expect(fetchMessages).not.toHaveBeenCalled()
   })
 
+  it('removeChat drops one chat and leaves others untouched', () => {
+    useMessagesStore.getState().upsertMessage('chat-1', msg(1))
+    useMessagesStore.getState().upsertMessage('chat-2', msg(1))
+
+    useMessagesStore.getState().removeChat('chat-1')
+
+    const state = useMessagesStore.getState().chats
+    expect(state['chat-1']).toBeUndefined()
+    expect(state['chat-2']).toBeDefined()
+  })
+
   // Regression test for the cross-account leak: reset() is what
   // AuthProvider.clearSessionState() relies on to keep one account's
   // message content from surviving into the next account's session.
