@@ -63,3 +63,55 @@ a {
     transform: rotate(360deg);
   }
 }
+
+/* Chat shell: side-by-side list + conversation, stacking to one pane at a
+   time below 640px (list vs. conversation, switched by data-mobile-view —
+   set from the route in ChatsLayout since inline styles can't do media
+   queries). Above the breakpoint both panes always show. */
+.chat-shell {
+  display: flex;
+  height: 100%;
+}
+
+.chat-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.chat-back-link {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .chat-sidebar {
+    width: 100%;
+  }
+
+  .chat-shell[data-mobile-view='list'] .chat-main {
+    display: none;
+  }
+
+  .chat-shell[data-mobile-view='conversation'] .chat-sidebar {
+    display: none;
+  }
+
+  .chat-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 8px;
+    color: var(--color-text);
+    text-decoration: none;
+    font-size: 13px;
+  }
+}

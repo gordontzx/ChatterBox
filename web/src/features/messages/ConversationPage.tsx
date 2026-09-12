@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { Spinner } from '../../components/ui'
 import { useAuth } from '../auth/AuthProvider'
 import { useChatsStore } from '../chats/chatStore'
@@ -44,8 +44,13 @@ export function ConversationPage() {
           borderBottom: '1px solid var(--color-border)',
           fontWeight: 600,
           fontSize: 14,
+          display: 'flex',
+          alignItems: 'center',
         }}
       >
+        <Link to="/" className="chat-back-link">
+          ← Back
+        </Link>
         {title}
       </header>
 
@@ -71,13 +76,18 @@ export function ConversationPage() {
         </div>
       ) : (
         <MessageList
+          key={chatId}
           messages={messages}
           selfId={user.id}
           senderName={(id) => memberNames.get(id) ?? '?'}
         />
       )}
 
-      <Composer disabled={wsStatus !== 'open'} onSend={(content) => sendMessage(chatId, content)} />
+      <Composer
+        key={chatId}
+        disabled={wsStatus !== 'open'}
+        onSend={(content) => sendMessage(chatId, content)}
+      />
     </>
   )
 }

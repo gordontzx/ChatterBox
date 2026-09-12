@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Avatar, Button, Spinner } from '../../components/ui'
 import { ConnectionStatus } from '../../components/ConnectionStatus'
 import { useAuth } from '../auth/AuthProvider'
@@ -11,22 +11,20 @@ export function ChatsLayout() {
   const { user, logout } = useAuth()
   const { chats, loading, loaded, error, loadChats } = useChatsStore()
   const [newChatOpen, setNewChatOpen] = useState(false)
+  const location = useLocation()
+
+  // Below 640px only one pane shows at a time (see .chat-shell in
+  // index.css); which one follows the route rather than separate state, so
+  // the browser back button naturally goes from conversation back to list.
+  const mobileView = location.pathname === '/' ? 'list' : 'conversation'
 
   useEffect(() => {
     if (!loaded && !loading) void loadChats()
   }, [loaded, loading, loadChats])
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
-      <aside
-        style={{
-          width: 280,
-          flexShrink: 0,
-          borderRight: '1px solid var(--color-border)',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
+    <div className="chat-shell" data-mobile-view={mobileView}>
+      <aside className="chat-sidebar">
         <header
           style={{
             padding: 16,
@@ -110,7 +108,7 @@ export function ChatsLayout() {
           })}
         </div>
       </aside>
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <main className="chat-main">
         <Outlet />
       </main>
       <NewChatDialog open={newChatOpen} onClose={() => setNewChatOpen(false)} />
