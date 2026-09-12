@@ -29,17 +29,21 @@ export function ChatsLayout() {
           style={{
             padding: 16,
             borderBottom: '1px solid var(--color-border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 8,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-            <Avatar name={user?.name ?? '?'} size={32} />
-            <div style={{ minWidth: 0 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <Avatar name={user?.name ?? '?'} size={32} />
               <div
                 style={{
+                  minWidth: 0,
                   fontSize: 13,
                   fontWeight: 600,
                   overflow: 'hidden',
@@ -49,16 +53,21 @@ export function ChatsLayout() {
               >
                 {user?.name ?? 'ChatterBox'}
               </div>
-              <ConnectionStatus />
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              <Button variant="secondary" onClick={() => setNewChatOpen(true)}>
+                + New
+              </Button>
+              <Button variant="ghost" onClick={() => void logout()}>
+                Log out
+              </Button>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            <Button variant="secondary" onClick={() => setNewChatOpen(true)}>
-              + New
-            </Button>
-            <Button variant="ghost" onClick={() => void logout()}>
-              Log out
-            </Button>
+          {/* Its own row, full width, so it never fights the buttons for
+              horizontal space — see bug: it used to share a row with them
+              in a fixed 280px sidebar and got visually covered when squeezed. */}
+          <div style={{ marginTop: 6, paddingLeft: 42 }}>
+            <ConnectionStatus />
           </div>
         </header>
         <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
