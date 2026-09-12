@@ -9,7 +9,7 @@ vi.mock('./api', () => ({
 import { fetchChats } from './api'
 
 function chat(id: string): Chat {
-  return { id, created_at: '2020-01-01T00:00:00Z', members: [] }
+  return { id, type: 'direct', created_at: '2020-01-01T00:00:00Z', members: [] }
 }
 
 describe('chatsStore', () => {
@@ -55,6 +55,24 @@ describe('chatsStore', () => {
     const state = useChatsStore.getState()
     expect(state.chats).toHaveLength(1)
     expect(state.chats[0].created_at).toBe('2021-01-01T00:00:00Z')
+  })
+
+  it('addMemberLocally appends a member without duplicating on repeat calls', () => {
+    useChatsStore.setState({ chats: [chat('g1')], loaded: true })
+
+    useChatsStore.getState().addMemberLocally('g1', { id: 'newbie', name: 'Newbie' })
+    useChatsStore.getState().addMemberLocally('g1', { id: 'newbie', name: 'Newbie' })
+
+    const members = useChatsStore.getState().chats[0].members
+    expect(members).toEqual([{ id: 'newbie', name: 'Newbie' }])
+  })
+
+  it('removeChatLocally drops the chat and leaves others untouched', () => {
+    useChatsStore.setState({ chats: [chat('1'), chat('2')], loaded: true })
+
+    useChatsStore.getState().removeChatLocally('1')
+
+    expect(useChatsStore.getState().chats.map((c) => c.id)).toEqual(['2'])
   })
 
   // Regression test for the cross-account leak: reset() is what

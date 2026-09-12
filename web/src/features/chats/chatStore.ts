@@ -16,6 +16,9 @@ interface ChatsState {
   // GET /chats/{id} to refetch from — so the caller (who already resolved
   // the User via searchUserByEmail) appends them to local state directly.
   addMemberLocally: (chatId: string, member: Member) => void
+  // POST /chats/{id}/leave returns 204 too — drop it from local state
+  // directly rather than waiting on a refetch.
+  removeChatLocally: (chatId: string) => void
   // Clears everything. Must run on logout (and on a forced sign-out) — this
   // store is a module-level singleton that outlives any one user's session,
   // so without this a second account signing in in the same tab would see
@@ -55,6 +58,9 @@ export const useChatsStore = create<ChatsState>((set, get) => ({
           : c,
       ),
     }))
+  },
+  removeChatLocally: (chatId) => {
+    set((s) => ({ chats: s.chats.filter((c) => c.id !== chatId) }))
   },
   reset: () => set({ chats: [], loading: false, loaded: false, error: null }),
 }))

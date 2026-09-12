@@ -30,3 +30,10 @@ export function createGroupChat(name: string, memberIds: string[]): Promise<Chat
 export function addMember(chatId: string, userId: string): Promise<void> {
   return api.post<void>(`/chats/${chatId}/members`, { user_id: userId })
 }
+
+// 204 No Content — the caller should remove the chat from local state
+// itself (chatStore.removeChatLocally); no GET /chats/{id} to refetch from,
+// and a subsequent GET /chats simply won't include it any more anyway.
+export function leaveChat(chatId: string): Promise<void> {
+  return api.post<void>(`/chats/${chatId}/leave`)
+}
