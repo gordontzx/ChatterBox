@@ -4,6 +4,7 @@ import { Button, Spinner } from '../../components/ui'
 import { useAuth } from '../auth/AuthProvider'
 import { AddMemberDialog } from '../chats/AddMemberDialog'
 import { useChatsStore } from '../chats/chatStore'
+import { GroupMembersDialog } from '../chats/GroupMembersDialog'
 import { chatTitle } from '../chats/utils'
 import { useRealtime } from '../realtime/RealtimeProvider'
 import { Composer } from './Composer'
@@ -22,6 +23,7 @@ export function ConversationPage() {
   const ensureLoaded = useMessagesStore((s) => s.ensureLoaded)
   const { status: wsStatus, sendMessage } = useRealtime()
   const [addMemberOpen, setAddMemberOpen] = useState(false)
+  const [membersOpen, setMembersOpen] = useState(false)
 
   useEffect(() => {
     if (chatId) void ensureLoaded(chatId)
@@ -63,9 +65,22 @@ export function ConversationPage() {
               {title}
             </div>
             {chat?.type === 'group' && (
-              <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+              <button
+                type="button"
+                onClick={() => setMembersOpen(true)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  font: 'inherit',
+                  fontSize: 12,
+                  color: 'var(--color-text-muted)',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                }}
+              >
                 {chat.members.length} members
-              </div>
+              </button>
             )}
           </div>
         </div>
@@ -112,7 +127,18 @@ export function ConversationPage() {
       />
 
       {chat?.type === 'group' && (
-        <AddMemberDialog open={addMemberOpen} onClose={() => setAddMemberOpen(false)} chat={chat} />
+        <>
+          <AddMemberDialog
+            open={addMemberOpen}
+            onClose={() => setAddMemberOpen(false)}
+            chat={chat}
+          />
+          <GroupMembersDialog
+            open={membersOpen}
+            onClose={() => setMembersOpen(false)}
+            chat={chat}
+          />
+        </>
       )}
     </>
   )
