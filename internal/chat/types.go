@@ -17,7 +17,7 @@ type Member struct {
 type Chat struct {
 	ID		  string	`json:"id"`
 	Type	  ChatType  `json:"type"`
-	Name	  string	`json:"name,omitempty"`	// nil for direct chats
+	Name	  *string	`json:"name,omitempty"`	// nil for direct chats
 	CreatedAt time.Time	`json:"created_at"`
 	Members   []Member	`json:"members"`
 }

@@ -94,7 +94,7 @@ func (s *Service) AddMember(ctx context.Context, callerID, chatID, userID string
 		return err
 	}
 	if !isMember {
-		return ErrAlreadyMember
+		return ErrNotChatMember
 	}
 
 	exists, err := s.store.UserExists(ctx, userID)
