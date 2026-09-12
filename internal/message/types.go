@@ -21,3 +21,9 @@ type OutgoingEvent struct {
 	Type	string  `json:"type"`
 	Message	Message `json:"message"`
 }
+
+type TypingEvent struct {
+	Type   string `json:"type"`
+	ChatID string `json:"chat_id"`
+	UserID string `json:"user_id"`
+}

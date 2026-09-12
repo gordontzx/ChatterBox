@@ -220,3 +220,28 @@ func TestGetMessagesSince_ClampsExcessiveLimit(t *testing.T) {
 		t.Fatalf("expected clamped to %d messages, got %d", maxMessageLimit, len(messages))
 	}
 }
+
+func TestSendTypingIndicator_Success(t *testing.T) {
+	store := newFakeStore()
+	store.members["chat-1"] = []string{"alice", "bob"}
+	svc := NewService(store)
+
+	others, err := svc.SendTypingIndicator(context.Background(), "alice", "chat-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(others) != 1 || others[0] != "bob" {
+		t.Fatalf("expected [bob], got %v", others)
+	}
+}
+
+func TestSendTypingIndicator_NotAMember(t *testing.T) {
+	store := newFakeStore()
+	store.members["chat-1"] = []string{"alice", "bob"}
+	svc := NewService(store)
+
+	_, err := svc.SendTypingIndicator(context.Background(), "carol", "chat-1")
+	if !errors.Is(err, ErrNotChatMember) {
+		t.Fatalf("expected ErrNotChatMember, got %v", err)
+	}
+}

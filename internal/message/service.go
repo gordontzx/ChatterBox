@@ -55,6 +55,18 @@ func (s *Service) SendMessage(ctx context.Context, senderID, chatID, content str
 	return &SendResult{Message: *msg, OtherMemberIDs: otherIDs}, nil
 }
 
+func (s *Service) SendTypingIndicator(ctx context.Context, senderID, chatID string) ([]string, error) {
+	isMember, err := s.store.IsChatMember(ctx, chatID, senderID)
+	if err != nil {
+		return nil, err
+	}
+	if !isMember {
+		return nil, ErrNotChatMember
+	}
+
+	return s.store.OtherChatMemberIDs(ctx, chatID, senderID)
+}
+
 func (s *Service) GetMessagesSince(ctx context.Context, callerID, chatID string, sinceSeq int64, limit int) ([]Message, error) {
 	isMember, err := s.store.IsChatMember(ctx, chatID, callerID)
 	if err != nil {

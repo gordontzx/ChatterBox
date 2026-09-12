@@ -71,8 +71,33 @@ func (c *Client) handleIncoming(raw []byte) {
 	switch incoming.Type {
 	case "message":
 		c.handleSendMessage(incoming)
+	case "typing":
+		c.handleTyping(incoming)
 	default:
 		log.Printf("unknown frame type %q from user %s", incoming.Type, c.userID)
+	}
+}
+
+func (c *Client) handleTyping(incoming message.IncomingMessage) {
+	otherIDs, err := c.msgSvc.SendTypingIndicator(context.Background(), c.userID, incoming.ChatID)
+	if err != nil {
+		log.Printf("typing indicator failed for user %s: %v", c.userID, err)
+		return
+	}
+
+	event := message.TypingEvent{
+		Type:   "typing",
+		ChatID: incoming.ChatID,
+		UserID: c.userID,
+	}
+	payload, err := json.Marshal(event)
+	if err != nil {
+		log.Printf("failed to marshal typing event: %v", err)
+		return
+	}
+
+	for _, memberID := range otherIDs {
+		c.hub.SendToUser(memberID, payload)
 	}
 }
 
