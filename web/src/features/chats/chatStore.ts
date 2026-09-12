@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { ApiError } from '../../lib/apiClient'
-import type { Chat } from '../../types'
+import type { Chat, Member } from '../../types'
 import { fetchChats } from './api'
 
 interface ChatsState {
@@ -12,6 +12,10 @@ interface ChatsState {
   // Inserts a newly-created chat (or updates it if POST /chats/direct
   // returned an existing one) without a full reload.
   addChat: (chat: Chat) => void
+  // POST /chats/{id}/members returns 204 with no body, and there's no
+  // GET /chats/{id} to refetch from — so the caller (who already resolved
+  // the User via searchUserByEmail) appends them to local state directly.
+  addMemberLocally: (chatId: string, member: Member) => void
   // Clears everything. Must run on logout (and on a forced sign-out) — this
   // store is a module-level singleton that outlives any one user's session,
   // so without this a second account signing in in the same tab would see
@@ -42,6 +46,15 @@ export const useChatsStore = create<ChatsState>((set, get) => ({
         chats: exists ? s.chats.map((c) => (c.id === chat.id ? chat : c)) : [chat, ...s.chats],
       }
     })
+  },
+  addMemberLocally: (chatId, member) => {
+    set((s) => ({
+      chats: s.chats.map((c) =>
+        c.id === chatId && !c.members.some((m) => m.id === member.id)
+          ? { ...c, members: [...c.members, member] }
+          : c,
+      ),
+    }))
   },
   reset: () => set({ chats: [], loading: false, loaded: false, error: null }),
 }))
