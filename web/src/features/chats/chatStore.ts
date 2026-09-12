@@ -9,6 +9,9 @@ interface ChatsState {
   loaded: boolean
   error: string | null
   loadChats: () => Promise<void>
+  // Inserts a newly-created chat (or updates it if POST /chats/direct
+  // returned an existing one) without a full reload.
+  addChat: (chat: Chat) => void
 }
 
 export const useChatsStore = create<ChatsState>((set, get) => ({
@@ -25,5 +28,13 @@ export const useChatsStore = create<ChatsState>((set, get) => ({
     } catch (err) {
       set({ loading: false, error: err instanceof ApiError ? err.message : 'Failed to load chats' })
     }
+  },
+  addChat: (chat) => {
+    set((s) => {
+      const exists = s.chats.some((c) => c.id === chat.id)
+      return {
+        chats: exists ? s.chats.map((c) => (c.id === chat.id ? chat : c)) : [chat, ...s.chats],
+      }
+    })
   },
 }))

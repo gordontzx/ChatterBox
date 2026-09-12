@@ -1,14 +1,16 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Avatar, Button, Spinner } from '../../components/ui'
 import { ConnectionStatus } from '../../components/ConnectionStatus'
 import { useAuth } from '../auth/AuthProvider'
 import { useChatsStore } from './chatStore'
+import { NewChatDialog } from './NewChatDialog'
 import { otherMember } from './utils'
 
 export function ChatsLayout() {
   const { user, logout } = useAuth()
   const { chats, loading, loaded, error, loadChats } = useChatsStore()
+  const [newChatOpen, setNewChatOpen] = useState(false)
 
   useEffect(() => {
     if (!loaded && !loading) void loadChats()
@@ -53,7 +55,7 @@ export function ChatsLayout() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            <Button variant="secondary" disabled>
+            <Button variant="secondary" onClick={() => setNewChatOpen(true)}>
               + New
             </Button>
             <Button variant="ghost" onClick={() => void logout()}>
@@ -111,6 +113,7 @@ export function ChatsLayout() {
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <Outlet />
       </main>
+      <NewChatDialog open={newChatOpen} onClose={() => setNewChatOpen(false)} />
     </div>
   )
 }
