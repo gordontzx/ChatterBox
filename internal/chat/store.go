@@ -284,7 +284,7 @@ func (s *PostgresStore) ShareAnyChat(ctx context.Context, user1, user2 string) (
 		`SELECT EXISTS(
 			SELECT 1 FROM chat_members cm1
 			JOIN chat_members cm2 on cm1.chat_id = cm2.chat_id
-			WHERE cm1.user_id = $1 AND cm2.user_id = $2;
+			WHERE cm1.user_id = $1 AND cm2.user_id = $2
 		)`,
 		user1, user2,
 	).Scan(&exists)
