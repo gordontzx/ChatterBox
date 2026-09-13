@@ -18,6 +18,7 @@ type Store interface {
 	ListChatsForUser(ctx context.Context, userID string) ([]*Chat, error)
 	IsChatMember(ctx context.Context, chatID, userID string) (bool, error)
 	UserExists(ctx context.Context, userID string) (bool, error)
+	ShareAnyChat(ctx context.Context, user1, user2 string) (bool, error)
 }
 
 type PostgresStore struct {
@@ -273,6 +274,19 @@ func (s *PostgresStore) UserExists(ctx context.Context, userID string) (bool, er
 	err := s.pool.QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`,
 		userID,
+	).Scan(&exists)
+	return exists, err
+}
+
+func (s *PostgresStore) ShareAnyChat(ctx context.Context, user1, user2 string) (bool, error) {
+	var exists bool
+	err := s.pool.QueryRow(ctx,
+		`SELECT EXISTS(
+			SELECT 1 FROM chat_members cm1
+			JOIN chat_members cm2 on cm1.chat_id = cm2.chat_id
+			WHERE cm1.user_id = $1 AND cm2.user_id = $2;
+		)`,
+		user1, user2,
 	).Scan(&exists)
 	return exists, err
 }

@@ -155,7 +155,7 @@ func (s *Service) ListContactIDs(ctx context.Context, userID string) ([]string, 
 		return nil, err
 	}
 
-	seen := map[string]struct{}{userID: struct{}{}}
+	seen := map[string]struct{}{userID: {}}
 	var contacts []string
 	for _, c := range chats {
 		for _, m := range c.Members {
@@ -167,4 +167,8 @@ func (s *Service) ListContactIDs(ctx context.Context, userID string) ([]string, 
 	}
 
 	return contacts, nil
+}
+
+func (s *Service) ShareAnyChat(ctx context.Context, user1, user2 string) (bool, error) {
+	return s.store.ShareAnyChat(ctx, user1, user2)
 }

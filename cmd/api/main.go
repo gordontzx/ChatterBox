@@ -57,7 +57,7 @@ func main() {
 
 	presenceStore := presence.NewPostgresStore(pool)
 	presenceSvc := presence.NewService(presenceStore, chatSvc, hub)
-	presenceHandler := presence.NewHandler(presenceSvc, hub)
+	presenceHandler := presence.NewHandler(presenceSvc, hub, chatSvc)
 
 	wsHandler := ws.NewHandler(hub, []byte(cfg.JWTSecret), msgSvc, presenceSvc)
 

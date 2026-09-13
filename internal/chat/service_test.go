@@ -142,6 +142,24 @@ func (f *fakeStore) ListChatsForUser(ctx context.Context, userID string) ([]*Cha
 	return result, nil
 }
 
+func (f *fakeStore) ShareAnyChat(ctx context.Context, user1, user2 string) (bool, error) {
+	for _, c := range f.chats {
+		var contains1, contains2 bool
+		for _, m := range c.Members {
+			if m.ID == user1 {
+				contains1 = true
+			}
+			if m.ID == user2 {
+				contains2 = true
+			}
+		}
+		if contains1 && contains2 {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // ---------- Direct chat tests ----------
 
 func TestCreateOrGetDirectChat_CreatesNewChat(t *testing.T) {
