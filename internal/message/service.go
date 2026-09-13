@@ -87,3 +87,36 @@ func clampLimit(limit int) int {
 	}
 	return min(limit, maxMessageLimit)
 }
+
+// Records that caller has read up to the given seq in the chat and returns other members who should be notified
+func (s *Service) MarkAsRead(ctx context.Context, userID, chatID string, upToSeq int64) ([]string, error) {
+	if upToSeq < 0 {
+		return nil, ErrInvalidSeq
+	}
+
+	isMember, err := s.store.IsChatMember(ctx, chatID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !isMember {
+		return nil, ErrNotChatMember
+	}
+
+	if err := s.store.UpsertReadReceipt(ctx, chatID, userID, upToSeq); err != nil {
+		return nil, err
+	}
+
+	return s.store.OtherChatMemberIDs(ctx, chatID, userID)
+}
+
+func (s *Service) GetReadReceipts(ctx context.Context, callerID, chatID string) ([]ReadReceipt, error) {
+	isMember, err := s.store.IsChatMember(ctx, chatID, callerID)
+	if err != nil {
+		return nil, err
+	}
+	if !isMember {
+		return nil, ErrNotChatMember
+	}
+
+	return s.store.GetReadReceiptsForChat(ctx, chatID)
+}
