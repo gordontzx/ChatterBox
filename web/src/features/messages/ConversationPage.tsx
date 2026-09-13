@@ -11,6 +11,7 @@ import { useRealtime } from '../realtime/RealtimeProvider'
 import { Composer } from './Composer'
 import { MessageList } from './MessageList'
 import { selectSortedMessages, useMessagesStore } from './messageStore'
+import { TypingIndicator } from './TypingIndicator'
 
 export function ConversationPage() {
   const { chatId } = useParams<{ chatId: string }>()
@@ -22,7 +23,7 @@ export function ConversationPage() {
 
   const chatMessages = useMessagesStore((s) => (chatId ? s.chats[chatId] : undefined))
   const ensureLoaded = useMessagesStore((s) => s.ensureLoaded)
-  const { status: wsStatus, sendMessage } = useRealtime()
+  const { status: wsStatus, sendMessage, sendTyping } = useRealtime()
   const [addMemberOpen, setAddMemberOpen] = useState(false)
   const [membersOpen, setMembersOpen] = useState(false)
   const [leaveOpen, setLeaveOpen] = useState(false)
@@ -127,10 +128,13 @@ export function ConversationPage() {
         />
       )}
 
+      <TypingIndicator chatId={chatId} memberName={(id) => memberNames.get(id) ?? '?'} />
+
       <Composer
         key={`composer-${chatId}`}
         disabled={wsStatus !== 'open'}
         onSend={(content) => sendMessage(chatId, content)}
+        onTyping={() => sendTyping(chatId)}
       />
 
       {chat?.type === 'group' && (

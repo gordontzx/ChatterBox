@@ -52,3 +52,16 @@ export interface IncomingMessageEvent {
   type: 'message'
   message: Message
 }
+
+export interface OutgoingTypingFrame {
+  type: 'typing'
+  chat_id: string
+}
+
+export interface IncomingTypingEvent {
+  type: 'typing'
+  chat_id: string
+  user_id: string
+}
+
+export type IncomingEvent = IncomingMessageEvent | IncomingTypingEvent
