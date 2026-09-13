@@ -13,27 +13,35 @@ func NewHub() *Hub {
 	}
 }
 
-func (h* Hub) Register(c *Client) {
+// Returns true if this is the client's first connection
+func (h* Hub) Register(c *Client) bool {
 	h.mut.Lock()
 	defer h.mut.Unlock()
 
+	isFirstConnection := len(h.clients[c.userID]) == 0
 	if h.clients[c.userID] == nil {
 		h.clients[c.userID] = make(map[*Client]struct{})
 	}
 	h.clients[c.userID][c] = struct{}{}
+	return isFirstConnection
 }
 
-func (h *Hub) Unregister(c *Client) {
+// Returns true if the client has 0 remaining connections
+func (h *Hub) Unregister(c *Client) bool {
 	h.mut.Lock()
-	defer h.mut.Unlock()
 
+	isNowFullyOffline := false
 	if conns, ok := h.clients[c.userID]; ok {
 		delete(conns, c)
 		if len(conns) == 0 {
 			delete(h.clients, c.userID)
+			isNowFullyOffline = true
 		}
 	}
+	h.mut.Unlock()
+
 	close(c.send)
+	return isNowFullyOffline
 }
 
 func (h* Hub) SendToUser(userID string, message []byte) {

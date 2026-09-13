@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -13,10 +14,24 @@ import (
 	"ChatterBox/internal/auth"
 )
 
+// fakePresence records calls without needing a real presence.Service.
+type fakePresence struct {
+	onlineCalls  []string
+	offlineCalls []string
+}
+
+func (f *fakePresence) UserWentOnline(ctx context.Context, userID string) {
+	f.onlineCalls = append(f.onlineCalls, userID)
+}
+
+func (f *fakePresence) UserWentOffline(ctx context.Context, userID string) {
+	f.offlineCalls = append(f.offlineCalls, userID)
+}
+
 func TestServeWS_AuthAndDelivery(t *testing.T) {
 	secret := []byte("test-secret")
 	hub := NewHub()
-	handler := NewHandler(hub, secret, nil)
+	handler := NewHandler(hub, secret, nil, nil) // no presence wired for this test
 
 	server := httptest.NewServer(http.HandlerFunc(handler.ServeWS))
 	defer server.Close()
@@ -34,9 +49,6 @@ func TestServeWS_AuthAndDelivery(t *testing.T) {
 	}
 	defer conn.Close()
 
-	// give the server a brief moment to finish registering the client in the Hub
-	// before we try to deliver to it (Register happens synchronously in ServeWS
-	// before the goroutines start, so this is mostly a safety margin).
 	time.Sleep(50 * time.Millisecond)
 
 	hub.SendToUser("user-1", []byte("hello over the wire"))
@@ -51,9 +63,39 @@ func TestServeWS_AuthAndDelivery(t *testing.T) {
 	}
 }
 
+func TestServeWS_FiresPresenceOnConnectAndDisconnect(t *testing.T) {
+	secret := []byte("test-secret")
+	hub := NewHub()
+	presence := &fakePresence{}
+	handler := NewHandler(hub, secret, nil, presence)
+
+	server := httptest.NewServer(http.HandlerFunc(handler.ServeWS))
+	defer server.Close()
+
+	token, _ := auth.IssueAccessToken("user-1", secret)
+	wsURL := strings.Replace(server.URL, "http://", "ws://", 1) + "/ws?token=" + url.QueryEscape(token)
+
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial failed: %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+	if len(presence.onlineCalls) != 1 || presence.onlineCalls[0] != "user-1" {
+		t.Fatalf("expected UserCameOnline called once for user-1, got %v", presence.onlineCalls)
+	}
+
+	conn.Close()
+	time.Sleep(100 * time.Millisecond) // give ReadPump's cleanup goroutine time to run
+
+	if len(presence.offlineCalls) != 1 || presence.offlineCalls[0] != "user-1" {
+		t.Fatalf("expected UserWentOffline called once for user-1, got %v", presence.offlineCalls)
+	}
+}
+
 func TestServeWS_MissingToken_Rejected(t *testing.T) {
 	hub := NewHub()
-	handler := NewHandler(hub, []byte("test-secret"), nil)
+	handler := NewHandler(hub, []byte("test-secret"), nil, nil)
 
 	server := httptest.NewServer(http.HandlerFunc(handler.ServeWS))
 	defer server.Close()
@@ -71,7 +113,7 @@ func TestServeWS_MissingToken_Rejected(t *testing.T) {
 
 func TestServeWS_InvalidToken_Rejected(t *testing.T) {
 	hub := NewHub()
-	handler := NewHandler(hub, []byte("test-secret"), nil)
+	handler := NewHandler(hub, []byte("test-secret"), nil, nil)
 
 	server := httptest.NewServer(http.HandlerFunc(handler.ServeWS))
 	defer server.Close()

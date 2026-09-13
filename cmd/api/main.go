@@ -59,7 +59,7 @@ func main() {
 	presenceSvc := presence.NewService(presenceStore, chatSvc, hub)
 	presenceHandler := presence.NewHandler(presenceSvc, hub)
 
-	wsHandler := ws.NewHandler(hub, []byte(cfg.JWTSecret), msgSvc)
+	wsHandler := ws.NewHandler(hub, []byte(cfg.JWTSecret), msgSvc, presenceSvc)
 
 	// Register routes
 	requireAuth := middleware.RequireAuth([]byte(cfg.JWTSecret))
