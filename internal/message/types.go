@@ -27,3 +27,19 @@ type TypingEvent struct {
 	ChatID string `json:"chat_id"`
 	UserID string `json:"user_id"`
 }
+
+type ReadReceipt struct {
+	UserID		string `json:"user_id"`
+	LastReadSeq int64  `json:"last_read_seq"`
+}
+
+type MarkAsReadRequest struct {
+	UpToSeq int64 `json:"up_to_seq"`
+}
+
+type ReadEvent struct {
+	Type	string `json:"type"`
+	ChatID	string `json:"chat_id"`
+	UserID	string `json:"user_id"`
+	UpToSeq int64  `json:"up_to_seq"`
+}

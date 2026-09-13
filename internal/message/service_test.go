@@ -10,6 +10,7 @@ import (
 type fakeStore struct {
 	members  map[string][]string // chatID -> member userIDs
 	messages []Message
+	receipts map[string]map[string]int64
 }
 
 func newFakeStore() *fakeStore {
@@ -54,6 +55,27 @@ func (f *fakeStore) GetMessagesSince(ctx context.Context, chatID string, sinceSe
 			}
 			result = append(result, m)
 		}
+	}
+	return result, nil
+}
+
+func (f *fakeStore) UpsertReadReceipt(ctx context.Context, chatID, userID string, upToSeq int64) error {
+	if f.receipts == nil {
+		f.receipts = map[string]map[string]int64{}
+	}
+	if f.receipts[chatID] == nil {
+		f.receipts[chatID] = map[string]int64{}
+	}
+	if upToSeq > f.receipts[chatID][userID] {
+		f.receipts[chatID][userID] = upToSeq
+	}
+	return nil
+}
+
+func (f *fakeStore) GetReadReceiptsForChat(ctx context.Context, chatID string) ([]ReadReceipt, error) {
+	var result []ReadReceipt
+	for userID, seq := range f.receipts[chatID] {
+		result = append(result, ReadReceipt{UserID: userID, LastReadSeq: seq})
 	}
 	return result, nil
 }
@@ -241,6 +263,62 @@ func TestSendTypingIndicator_NotAMember(t *testing.T) {
 	svc := NewService(store)
 
 	_, err := svc.SendTypingIndicator(context.Background(), "carol", "chat-1")
+	if !errors.Is(err, ErrNotChatMember) {
+		t.Fatalf("expected ErrNotChatMember, got %v", err)
+	}
+}
+
+func TestMarkAsRead_Success(t *testing.T) {
+	store := newFakeStore()
+	store.members["chat-1"] = []string{"alice", "bob"}
+	svc := NewService(store)
+
+	others, err := svc.MarkAsRead(context.Background(), "alice", "chat-1", 5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(others) != 1 || others[0] != "bob" {
+		t.Fatalf("expected [bob], got %v", others)
+	}
+
+	receipts, _ := svc.GetReadReceipts(context.Background(), "alice", "chat-1")
+	if len(receipts) != 1 || receipts[0].LastReadSeq != 5 {
+		t.Fatalf("expected receipt at seq 5, got %+v", receipts)
+	}
+}
+
+func TestMarkAsRead_NeverRegresses(t *testing.T) {
+	store := newFakeStore()
+	store.members["chat-1"] = []string{"alice", "bob"}
+	svc := NewService(store)
+	ctx := context.Background()
+
+	svc.MarkAsRead(ctx, "alice", "chat-1", 10)
+	svc.MarkAsRead(ctx, "alice", "chat-1", 3) // stale, should NOT regress
+
+	receipts, _ := svc.GetReadReceipts(ctx, "alice", "chat-1")
+	if receipts[0].LastReadSeq != 10 {
+		t.Fatalf("expected watermark to stay at 10, got %d", receipts[0].LastReadSeq)
+	}
+}
+
+func TestMarkAsRead_NegativeSeq(t *testing.T) {
+	store := newFakeStore()
+	store.members["chat-1"] = []string{"alice", "bob"}
+	svc := NewService(store)
+
+	_, err := svc.MarkAsRead(context.Background(), "alice", "chat-1", -1)
+	if !errors.Is(err, ErrInvalidSeq) {
+		t.Fatalf("expected ErrInvalidSeq, got %v", err)
+	}
+}
+
+func TestMarkAsRead_NotAMember(t *testing.T) {
+	store := newFakeStore()
+	store.members["chat-1"] = []string{"alice", "bob"}
+	svc := NewService(store)
+
+	_, err := svc.MarkAsRead(context.Background(), "carol", "chat-1", 5)
 	if !errors.Is(err, ErrNotChatMember) {
 		t.Fatalf("expected ErrNotChatMember, got %v", err)
 	}
