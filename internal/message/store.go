@@ -11,6 +11,8 @@ type Store interface {
 	OtherChatMemberIDs(ctx context.Context, chatID, excludeUserID string) ([]string, error)
 	CreateMessage(ctx context.Context, chatID, senderID, content string) (*Message, error)
 	GetMessagesSince(ctx context.Context, chatID string, sinceSeq int64, limit int) ([]Message, error)
+	UpsertReadReceipt(ctx context.Context, chatID, userID, upToSeq int64) error
+	GetReadReceiptsForChat(ctx context.Context, chatID string) ([]ReadReceipt, error)
 }
 
 type PostgresStore struct {
@@ -111,4 +113,38 @@ func (s *PostgresStore) GetMessagesSince(ctx context.Context, chatID string, sin
 		messages = append(messages, m)
 	}
 	return messages, rows.Err()
+}
+
+func (s *PostgresStore) UpsertReadReceipt(ctx context.Context, chatID, userID string, upToSeq int64) error {
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO read_receipts (chat_id, user_id, last_read_seq)
+		 VALUES ($1, $2, $3)
+		 ON CONFLICT (chat_id, user_id)
+		 DO UPDATE SET last_read_seq = GREATEST(read_receipts.last_read_seq, EXCLUDED.last_read_seq),
+		 			   updated_at = now()`,
+		chatID, userID, upToSeq,
+	)
+	return err
+}
+
+func (s *PostgresStore) GetReadReceiptsForChat(ctx context.Context, chatID string) ([]ReadReceipt, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT user_id, last_read_seq FROM read_receipts WHERE chat_id = $1`,
+		chatID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var receipts []ReadReceipt
+	for rows.Next() {
+		var r ReadReceipt
+		if err := rows.Scan(&r.UserID, &r.LastReadSeq); err != nil {
+			return nil, err
+		}
+		receipts = append(receipts, r)
+	}
+
+	return receipts, rows.Err()
 }
