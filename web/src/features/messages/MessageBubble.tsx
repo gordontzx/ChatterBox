@@ -51,7 +51,11 @@ export function MessageBubble({ message, isOwn, senderName, seen }: MessageBubbl
         }}
       >
         {formatTime(message.created_at)}
-        {isOwn && seen && <span aria-label="Seen">✓✓</span>}
+        {isOwn && seen && (
+          <span aria-label="Seen" style={{ letterSpacing: '-0.5em', paddingRight: '0.5em' }}>
+            ✓✓
+          </span>
+        )}
       </span>
     </div>
   )
