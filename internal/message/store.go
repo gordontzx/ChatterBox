@@ -11,7 +11,7 @@ type Store interface {
 	OtherChatMemberIDs(ctx context.Context, chatID, excludeUserID string) ([]string, error)
 	CreateMessage(ctx context.Context, chatID, senderID, content string) (*Message, error)
 	GetMessagesSince(ctx context.Context, chatID string, sinceSeq int64, limit int) ([]Message, error)
-	UpsertReadReceipt(ctx context.Context, chatID, userID, upToSeq int64) error
+	UpsertReadReceipt(ctx context.Context, chatID, userID string, upToSeq int64) error
 	GetReadReceiptsForChat(ctx context.Context, chatID string) ([]ReadReceipt, error)
 }
 

@@ -10,6 +10,7 @@ import (
 type fakeStore struct {
 	members  map[string][]string // chatID -> member userIDs
 	messages []Message
+	receipts map[string]map[string]int64
 }
 
 func newFakeStore() *fakeStore {
@@ -54,6 +55,27 @@ func (f *fakeStore) GetMessagesSince(ctx context.Context, chatID string, sinceSe
 			}
 			result = append(result, m)
 		}
+	}
+	return result, nil
+}
+
+func (f *fakeStore) UpsertReadReceipt(ctx context.Context, chatID, userID string, upToSeq int64) error {
+	if f.receipts == nil {
+		f.receipts = map[string]map[string]int64{}
+	}
+	if f.receipts[chatID] == nil {
+		f.receipts[chatID] = map[string]int64{}
+	}
+	if upToSeq > f.receipts[chatID][userID] {
+		f.receipts[chatID][userID] = upToSeq
+	}
+	return nil
+}
+
+func (f *fakeStore) GetReadReceiptsForChat(ctx context.Context, chatID string) ([]ReadReceipt, error) {
+	var result []ReadReceipt
+	for userID, seq := range f.receipts[chatID] {
+		result = append(result, ReadReceipt{UserID: userID, LastReadSeq: seq})
 	}
 	return result, nil
 }
