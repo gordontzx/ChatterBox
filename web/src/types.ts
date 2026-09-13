@@ -89,5 +89,31 @@ export interface IncomingPresenceEvent {
   last_seen_at?: string
 }
 
+// internal/chat/types.go: ChatEvent. `member` is only present for
+// member_added/member_left (omitempty on the backend for chat_created).
+export interface IncomingChatCreatedEvent {
+  type: 'chat_created'
+  chat: Chat
+}
+
+export interface IncomingMemberAddedEvent {
+  type: 'member_added'
+  chat: Chat
+  member: Member
+}
+
+export interface IncomingMemberLeftEvent {
+  type: 'member_left'
+  chat: Chat
+  member: Member
+}
+
+export type IncomingChatEvent =
+  IncomingChatCreatedEvent | IncomingMemberAddedEvent | IncomingMemberLeftEvent
+
 export type IncomingEvent =
-  IncomingMessageEvent | IncomingTypingEvent | IncomingReadEvent | IncomingPresenceEvent
+  | IncomingMessageEvent
+  | IncomingTypingEvent
+  | IncomingReadEvent
+  | IncomingPresenceEvent
+  | IncomingChatEvent

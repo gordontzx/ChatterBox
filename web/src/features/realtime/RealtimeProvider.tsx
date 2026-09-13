@@ -12,6 +12,7 @@ import { getAccessToken } from '../../lib/tokens'
 import { WsClient, type WsStatus } from '../../lib/ws'
 import type { IncomingEvent, OutgoingChatFrame, OutgoingTypingFrame } from '../../types'
 import { useAuth } from '../auth/AuthProvider'
+import { useChatsStore } from '../chats/chatStore'
 import { useMessagesStore } from '../messages/messageStore'
 import { useReadStore } from '../messages/readStore'
 import { useTypingStore } from '../messages/typingStore'
@@ -76,6 +77,15 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         useReadStore.getState().markRead(parsed.chat_id, parsed.user_id, parsed.up_to_seq)
       } else if (parsed.type === 'presence') {
         usePresenceStore.getState().setPresence(parsed.user_id, parsed.online, parsed.last_seen_at)
+      } else if (
+        parsed.type === 'chat_created' ||
+        parsed.type === 'member_added' ||
+        parsed.type === 'member_left'
+      ) {
+        // Each event carries the full, already-updated chat — upserting it
+        // covers a brand-new chat (not yet in the list) and a membership
+        // change on one already loaded, in one call.
+        useChatsStore.getState().addChat(parsed.chat)
       }
     })
 
@@ -97,6 +107,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     }
     useReadStore.getState().refreshAll()
     usePresenceStore.getState().refreshAll()
+    void useChatsStore.getState().loadChats()
   }, [wsStatus])
 
   const value = useMemo<RealtimeContextValue>(
