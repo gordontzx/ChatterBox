@@ -51,11 +51,18 @@ export function MessageBubble({ message, isOwn, senderName, seen }: MessageBubbl
         }}
       >
         {formatTime(message.created_at)}
-        {isOwn && seen && (
-          <span aria-label="Seen" style={{ letterSpacing: '-0.5em', paddingRight: '0.5em' }}>
-            ✓✓
-          </span>
-        )}
+        {isOwn &&
+          (seen ? (
+            <span aria-label="Seen" style={{ letterSpacing: '-0.5em', paddingRight: '0.5em' }}>
+              ✓✓
+            </span>
+          ) : (
+            // Every own message rendered here has already round-tripped
+            // through the server (this app has no optimistic send — a
+            // bubble only appears once the WS echo confirms it's stored),
+            // so "sent" needs no state of its own: it's just "not seen yet".
+            <span aria-label="Sent">✓</span>
+          ))}
       </span>
     </div>
   )

@@ -125,7 +125,7 @@ describe('ConversationPage', () => {
     expect(await screen.findByText('✓✓')).toBeTruthy()
   })
 
-  it('does not show the seen tick when the other member has not caught up yet', async () => {
+  it('shows a single "sent" tick, not "seen", when the other member has not caught up yet', async () => {
     useReadStore.setState({
       chats: { 'bob-chat': { receipts: { 'bob-chat-other': 0 }, loaded: true, loading: false } },
     })
@@ -135,6 +135,7 @@ describe('ConversationPage', () => {
 
     render(<RouterProvider router={router} />)
 
+    expect(await screen.findByText('✓')).toBeTruthy()
     expect(screen.queryByText('✓✓')).toBeNull()
   })
 })
