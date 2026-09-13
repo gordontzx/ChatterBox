@@ -16,7 +16,9 @@ interface MessageListProps {
 // Auto-scrolls to the newest message only when the viewer was already near
 // the bottom (so reading old history doesn't get yanked away by an
 // incoming message); otherwise shows a "new messages" pill. Render this
-// with `key={chatId}` at the call site so switching chats resets it.
+// with `key={chatId}` at the call site so switching chats resets it — that
+// remount is also what makes the mount-time scroll-to-bottom below fire
+// again on every chat open.
 export function MessageList({ messages, selfId, senderName, isSeenByAll }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -35,6 +37,16 @@ export function MessageList({ messages, selfId, senderName, isSeenByAll }: Messa
     wasNearBottomRef.current = nearBottom
     if (nearBottom) setNewBelow(false)
   }
+
+  // Jumps to the bottom once per mount, regardless of whether the message
+  // count "grew" — covers reopening a chat whose messages are already
+  // cached from earlier this session (count is already full at mount, so
+  // the grew-effect below never fires and this was previously the only
+  // case that left the view sitting at the top instead of the bottom).
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: 'end' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     const grew = messages.length > prevCountRef.current
