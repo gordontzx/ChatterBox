@@ -14,20 +14,22 @@ import { useChatsStore } from '../chats/chatStore'
 import { useMessagesStore } from '../messages/messageStore'
 import { useReadStore } from '../messages/readStore'
 import { useTypingStore } from '../messages/typingStore'
+import { usePresenceStore } from '../presence/presenceStore'
 import { fetchMe, login as loginRequest, logout as logoutRequest, registerUser } from './api'
 
-// chatStore/messageStore/typingStore/readStore are module-level singletons
-// that outlive any one user's session. Without this, signing out and a
-// different account signing in in the same tab would keep showing the
-// previous account's chats and messages until something happened to
-// trigger a refetch — they're keyed by chat id, not by user, so nothing
-// about a new login naturally clears them.
+// chatStore/messageStore/typingStore/readStore/presenceStore are
+// module-level singletons that outlive any one user's session. Without
+// this, signing out and a different account signing in in the same tab
+// would keep showing the previous account's chats and messages until
+// something happened to trigger a refetch — they're keyed by chat id, not
+// by user, so nothing about a new login naturally clears them.
 function clearSessionState() {
   clearTokens()
   useChatsStore.getState().reset()
   useMessagesStore.getState().reset()
   useTypingStore.getState().reset()
   useReadStore.getState().reset()
+  usePresenceStore.getState().reset()
 }
 
 // Keeps the access token from ever expiring mid-session (it's good for 15
