@@ -2,6 +2,7 @@ package presence
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -36,7 +37,7 @@ func (s *PostgresStore) GetLastSeen(ctx context.Context, userID string) (*time.T
 		userID,
 	).Scan(&lastSeen)
 
-	if err == pgx.ErrNoRows {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	return lastSeen, err
