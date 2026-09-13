@@ -13,6 +13,7 @@ import { WsClient, type WsStatus } from '../../lib/ws'
 import type { IncomingEvent, OutgoingChatFrame, OutgoingTypingFrame } from '../../types'
 import { useAuth } from '../auth/AuthProvider'
 import { useMessagesStore } from '../messages/messageStore'
+import { useReadStore } from '../messages/readStore'
 import { useTypingStore } from '../messages/typingStore'
 
 interface RealtimeContextValue {
@@ -70,6 +71,8 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         useMessagesStore.getState().upsertMessage(parsed.message.chat_id, parsed.message)
       } else if (parsed.type === 'typing') {
         useTypingStore.getState().markTyping(parsed.chat_id, parsed.user_id)
+      } else if (parsed.type === 'read') {
+        useReadStore.getState().markRead(parsed.chat_id, parsed.user_id, parsed.up_to_seq)
       }
     })
 
@@ -89,6 +92,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     for (const chatId of Object.keys(useMessagesStore.getState().chats)) {
       void useMessagesStore.getState().resync(chatId)
     }
+    useReadStore.getState().refreshAll()
   }, [wsStatus])
 
   const value = useMemo<RealtimeContextValue>(

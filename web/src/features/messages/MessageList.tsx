@@ -8,13 +8,16 @@ interface MessageListProps {
   messages: Message[]
   selfId: string
   senderName: (senderId: string) => string
+  // Whether every other chat member has read up to this message's seq.
+  // Only rendered for the viewer's own messages.
+  isSeenByAll?: (seq: number) => boolean
 }
 
 // Auto-scrolls to the newest message only when the viewer was already near
 // the bottom (so reading old history doesn't get yanked away by an
 // incoming message); otherwise shows a "new messages" pill. Render this
 // with `key={chatId}` at the call site so switching chats resets it.
-export function MessageList({ messages, selfId, senderName }: MessageListProps) {
+export function MessageList({ messages, selfId, senderName, isSeenByAll }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const wasNearBottomRef = useRef(true)
@@ -63,6 +66,7 @@ export function MessageList({ messages, selfId, senderName }: MessageListProps) 
             message={m}
             isOwn={m.sender_id === selfId}
             senderName={senderName(m.sender_id)}
+            seen={isSeenByAll?.(m.seq)}
           />
         ))}
         <div ref={bottomRef} />

@@ -64,4 +64,16 @@ export interface IncomingTypingEvent {
   user_id: string
 }
 
-export type IncomingEvent = IncomingMessageEvent | IncomingTypingEvent
+export interface ReadReceipt {
+  user_id: string
+  last_read_seq: number
+}
+
+export interface IncomingReadEvent {
+  type: 'read'
+  chat_id: string
+  user_id: string
+  up_to_seq: number
+}
+
+export type IncomingEvent = IncomingMessageEvent | IncomingTypingEvent | IncomingReadEvent
