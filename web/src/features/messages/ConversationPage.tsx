@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Button, Spinner } from '../../components/ui'
 import { useAuth } from '../auth/AuthProvider'
@@ -8,9 +8,11 @@ import { GroupMembersDialog } from '../chats/GroupMembersDialog'
 import { LeaveChatDialog } from '../chats/LeaveChatDialog'
 import { chatTitle } from '../chats/utils'
 import { useRealtime } from '../realtime/RealtimeProvider'
+import { markAsRead } from './api'
 import { Composer } from './Composer'
 import { MessageList } from './MessageList'
 import { selectSortedMessages, useMessagesStore } from './messageStore'
+import { EMPTY_RECEIPTS, useReadStore } from './readStore'
 import { TypingIndicator } from './TypingIndicator'
 
 export function ConversationPage() {
@@ -23,19 +25,52 @@ export function ConversationPage() {
 
   const chatMessages = useMessagesStore((s) => (chatId ? s.chats[chatId] : undefined))
   const ensureLoaded = useMessagesStore((s) => s.ensureLoaded)
+  const ensureReceiptsLoaded = useReadStore((s) => s.ensureLoaded)
+  const receipts = useReadStore((s) =>
+    chatId ? (s.chats[chatId]?.receipts ?? EMPTY_RECEIPTS) : EMPTY_RECEIPTS,
+  )
   const { status: wsStatus, sendMessage, sendTyping } = useRealtime()
   const [addMemberOpen, setAddMemberOpen] = useState(false)
   const [membersOpen, setMembersOpen] = useState(false)
   const [leaveOpen, setLeaveOpen] = useState(false)
+  const lastMarkedReadRef = useRef<{ chatId: string; seq: number }>({ chatId: '', seq: 0 })
 
   useEffect(() => {
     if (chatId) void ensureLoaded(chatId)
   }, [chatId, ensureLoaded])
 
+  useEffect(() => {
+    if (chatId) void ensureReceiptsLoaded(chatId)
+  }, [chatId, ensureReceiptsLoaded])
+
+  // Mark read once when opening a chat, and again each time a new message
+  // lands while it's still the one open — guarded so it only fires when
+  // there's actually something new to report, not on every render. Kept
+  // above the early return below (chatId/user can be missing) since hooks
+  // can't be called conditionally.
+  const messages = selectSortedMessages(chatMessages)
+  const latestSeq = messages.length ? messages[messages.length - 1].seq : 0
+  useEffect(() => {
+    if (!chatId || latestSeq === 0) return
+    if (lastMarkedReadRef.current.chatId === chatId && lastMarkedReadRef.current.seq >= latestSeq) {
+      return
+    }
+    lastMarkedReadRef.current = { chatId, seq: latestSeq }
+    markAsRead(chatId, latestSeq).catch(() => {
+      // Best-effort — if this fails, the next seq advance (or reopening
+      // the chat) will just try again with a higher/equal value.
+    })
+  }, [chatId, latestSeq])
+
   if (!chatId || !user) return null
 
-  const messages = selectSortedMessages(chatMessages)
   const memberNames = new Map(chat?.members.map((m) => [m.id, m.name]))
+  const otherMemberIds = chat?.members.filter((m) => m.id !== user.id).map((m) => m.id) ?? []
+
+  function isSeenByAll(seq: number): boolean {
+    if (otherMemberIds.length === 0) return false
+    return otherMemberIds.every((id) => (receipts[id] ?? 0) >= seq)
+  }
 
   const title = chat ? chatTitle(chat, user.id) : chatsLoaded ? 'Chat not found' : 'Loading…'
 
@@ -125,6 +160,7 @@ export function ConversationPage() {
           messages={messages}
           selfId={user.id}
           senderName={(id) => memberNames.get(id) ?? '?'}
+          isSeenByAll={isSeenByAll}
         />
       )}
 

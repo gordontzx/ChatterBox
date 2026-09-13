@@ -5,9 +5,12 @@ interface MessageBubbleProps {
   message: Message
   isOwn: boolean
   senderName: string
+  // Only meaningful (and only ever passed) for isOwn messages: true once
+  // every other chat member has read up to this message's seq.
+  seen?: boolean
 }
 
-export function MessageBubble({ message, isOwn, senderName }: MessageBubbleProps) {
+export function MessageBubble({ message, isOwn, senderName, seen }: MessageBubbleProps) {
   return (
     <div
       style={{
@@ -37,8 +40,18 @@ export function MessageBubble({ message, isOwn, senderName }: MessageBubbleProps
       >
         {message.content}
       </div>
-      <span style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 2 }}>
+      <span
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          fontSize: 10,
+          color: seen ? 'var(--color-primary)' : 'var(--color-text-muted)',
+          marginTop: 2,
+        }}
+      >
         {formatTime(message.created_at)}
+        {isOwn && seen && <span aria-label="Seen">✓✓</span>}
       </span>
     </div>
   )

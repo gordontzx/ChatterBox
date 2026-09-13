@@ -7,6 +7,7 @@ import type { Chat, Message, User } from '../../types'
 import { useChatsStore } from '../chats/chatStore'
 import { ConversationPage } from './ConversationPage'
 import { useMessagesStore } from './messageStore'
+import { useReadStore } from './readStore'
 
 const SELF: User = { id: 'self', name: 'Self', email: 'self@example.com' }
 
@@ -26,6 +27,8 @@ vi.mock('../realtime/RealtimeProvider', () => ({
 
 vi.mock('./api', () => ({
   fetchMessages: vi.fn().mockResolvedValue([]),
+  markAsRead: vi.fn().mockResolvedValue(undefined),
+  fetchReadReceipts: vi.fn().mockResolvedValue([]),
 }))
 
 function chat(id: string, otherName: string): Chat {
@@ -57,6 +60,7 @@ describe('ConversationPage', () => {
 
     useChatsStore.getState().reset()
     useMessagesStore.getState().reset()
+    useReadStore.getState().reset()
     useChatsStore.setState({
       chats: [chat('bob-chat', 'Bob'), chat('charlie-chat', 'Charlie')],
       loaded: true,
