@@ -21,7 +21,7 @@ vi.mock('../auth/AuthProvider', () => ({
 }))
 
 vi.mock('../realtime/RealtimeProvider', () => ({
-  useRealtime: () => ({ status: 'open', sendMessage: vi.fn() }),
+  useRealtime: () => ({ status: 'open', sendMessage: vi.fn(), sendTyping: vi.fn() }),
 }))
 
 vi.mock('./api', () => ({

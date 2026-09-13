@@ -10,13 +10,15 @@ import {
 import { refreshAccessToken } from '../../lib/apiClient'
 import { getAccessToken } from '../../lib/tokens'
 import { WsClient, type WsStatus } from '../../lib/ws'
-import type { IncomingMessageEvent, OutgoingChatFrame } from '../../types'
+import type { IncomingEvent, OutgoingChatFrame, OutgoingTypingFrame } from '../../types'
 import { useAuth } from '../auth/AuthProvider'
 import { useMessagesStore } from '../messages/messageStore'
+import { useTypingStore } from '../messages/typingStore'
 
 interface RealtimeContextValue {
   status: WsStatus
   sendMessage: (chatId: string, content: string) => void
+  sendTyping: (chatId: string) => void
 }
 
 const RealtimeContext = createContext<RealtimeContextValue | null>(null)
@@ -58,14 +60,16 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
     const offStatus = client.onStatusChange(setWsStatus)
     const offMessage = client.onMessage((raw) => {
-      let parsed: IncomingMessageEvent
+      let parsed: IncomingEvent
       try {
-        parsed = JSON.parse(raw) as IncomingMessageEvent
+        parsed = JSON.parse(raw) as IncomingEvent
       } catch {
         return // malformed frame — nothing sensible to do with it
       }
       if (parsed.type === 'message') {
         useMessagesStore.getState().upsertMessage(parsed.message.chat_id, parsed.message)
+      } else if (parsed.type === 'typing') {
+        useTypingStore.getState().markTyping(parsed.chat_id, parsed.user_id)
       }
     })
 
@@ -92,6 +96,10 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       status: wsStatus,
       sendMessage: (chatId, content) => {
         const frame: OutgoingChatFrame = { type: 'message', chat_id: chatId, content }
+        clientRef.current?.send(JSON.stringify(frame))
+      },
+      sendTyping: (chatId) => {
+        const frame: OutgoingTypingFrame = { type: 'typing', chat_id: chatId }
         clientRef.current?.send(JSON.stringify(frame))
       },
     }),
