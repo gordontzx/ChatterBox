@@ -63,6 +63,7 @@ func parseOptionalInt64(raw string, fallback int64) (int64, bool) {
 	return parsed, true
 }
 
+// POST /chats/{chatID}/read (protected route)
 func (h *Handler) MarkAsRead(w http.ResponseWriter, r *http.Request) {
 	callerID := middleware.UserIDFromContext(r.Context())
 	chatID := r.PathValue("chatID")
@@ -92,6 +93,7 @@ func (h *Handler) MarkAsRead(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// GET /chats/{chatID}/read_receipts (protected route)
 func (h *Handler) GetReadReceipts(w http.ResponseWriter, r *http.Request) {
 	callerID := middleware.UserIDFromContext(r.Context())
 	chatID := r.PathValue("chatID")

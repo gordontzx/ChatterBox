@@ -72,8 +72,8 @@ func main() {
 	mux.Handle("GET /chats", requireAuth(http.HandlerFunc(chatHandler.List)))
 
 	mux.Handle("GET /chats/{chatID}/messages", requireAuth(http.HandlerFunc(msgHandler.GetMessages)))
-	mux.Handle("Get /chats/{chatID}/read", requireAuth(http.HandlerFunc(msgHandler.MarkAsRead)))
-	mux.Handle("Get /chats/{chatID}/read_receipts", requireAuth(http.HandlerFunc(msgHandler.GetReadReceipts)))
+	mux.Handle("POST /chats/{chatID}/read", requireAuth(http.HandlerFunc(msgHandler.MarkAsRead)))
+	mux.Handle("GET /chats/{chatID}/read_receipts", requireAuth(http.HandlerFunc(msgHandler.GetReadReceipts)))
 
 	mux.Handle("GET /users/me", requireAuth(http.HandlerFunc(userHandler.Me)))
 	mux.Handle("GET /users/search", requireAuth(http.HandlerFunc(userHandler.SearchByEmail)))
