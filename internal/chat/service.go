@@ -148,3 +148,23 @@ func (s *Service) RemoveMember(ctx context.Context, callerID, chatID, targetUser
 func (s *Service) LeaveChat(ctx context.Context, callerID, chatID string) error {
 	return s.RemoveMember(ctx, callerID, chatID, callerID)
 }
+
+func (s *Service) ListContactIDs(ctx context.Context, userID string) ([]string, error) {
+	chats, err := s.store.ListChatsForUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := map[string]struct{}{userID: struct{}{}}
+	var contacts []string
+	for _, c := range chats {
+		for _, m := range c.Members {
+			if _, exists := seen[m.ID]; !exists {
+				seen[m.ID] = struct{}{}
+				contacts = append(contacts, m.ID)
+			}
+		}
+	}
+
+	return contacts, nil
+}
