@@ -7,12 +7,11 @@ export default defineConfig({
   server: {
     proxy: {
       '/auth': 'http://localhost:8080',
-      '/chats': 'http://localhost:8080',
       '/users': 'http://localhost:8080',
-      '/ws': {
-        target: 'ws://localhost:8080',
-        ws: true,
-      },
+      '/ws': { target: 'ws://localhost:8080', ws: true },
+      '^/chats(\\?.*)?$': 'http://localhost:8080',
+      '^/chats/(direct|group)(\\?.*)?$': 'http://localhost:8080',
+      '^/chats/[^/]+/(messages|members|leave)(\\?.*)?$': 'http://localhost:8080',
     },
   },
   test: {
