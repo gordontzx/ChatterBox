@@ -48,3 +48,9 @@ func (h* Hub) SendToUser(userID string, message []byte) {
 		}
 	}
 }
+
+func (h *Hub) IsOnline(userID string) bool {
+	h.mut.RLock()
+	defer h.mut.RUnlock()
+	return len(h.clients[userID]) > 0
+}
