@@ -34,3 +34,9 @@ type CreateGroupChatRequest struct {
 type AddMemberRequest struct {
 	UserID string `json:"user_id"`
 }
+
+type ChatEvent struct {
+	Type   string  `json:"type"` // "chat_created", "member_added", "member_left"
+	Chat   *Chat   `json:"chat"`
+	Member *Member `json:"member,omitempty"` // the member who was added/left
+}

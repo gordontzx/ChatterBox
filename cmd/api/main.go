@@ -45,7 +45,7 @@ func main() {
 
 	chatStore := chat.NewPostgresStore(pool)
 	chatSvc := chat.NewService(chatStore)
-	chatHandler := chat.NewHandler(chatSvc)
+	chatHandler := chat.NewHandler(chatSvc, hub)
 
 	msgStore := message.NewPostgresStore(pool)
 	msgSvc := message.NewService(msgStore)

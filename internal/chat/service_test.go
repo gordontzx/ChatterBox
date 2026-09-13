@@ -168,9 +168,12 @@ func TestCreateOrGetDirectChat_CreatesNewChat(t *testing.T) {
 	store.seedUser("bob", "Bob")
 	svc := NewService(store)
 
-	c, err := svc.CreateOrGetDirectChat(context.Background(), "alice", "bob")
+	c, wasCreated, err := svc.CreateOrGetDirectChat(context.Background(), "alice", "bob")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if !wasCreated {
+		t.Fatal("expected wasCreated = true for a brand new chat")
 	}
 	if c.Type != ChatTypeDirect {
 		t.Fatalf("expected direct chat type, got %s", c.Type)
@@ -186,7 +189,7 @@ func TestCreateOrGetDirectChat_IncludesMemberNames(t *testing.T) {
 	store.seedUser("bob", "Bob")
 	svc := NewService(store)
 
-	c, err := svc.CreateOrGetDirectChat(context.Background(), "alice", "bob")
+	c, _, err := svc.CreateOrGetDirectChat(context.Background(), "alice", "bob")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -209,13 +212,20 @@ func TestCreateOrGetDirectChat_ReturnsExistingChat(t *testing.T) {
 	svc := NewService(store)
 	ctx := context.Background()
 
-	first, err := svc.CreateOrGetDirectChat(ctx, "alice", "bob")
+	first, wasCreatedFirst, err := svc.CreateOrGetDirectChat(ctx, "alice", "bob")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	second, err := svc.CreateOrGetDirectChat(ctx, "alice", "bob")
+	if !wasCreatedFirst {
+		t.Fatal("expected first call to report wasCreated = true")
+	}
+
+	second, wasCreatedSecond, err := svc.CreateOrGetDirectChat(ctx, "alice", "bob")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if wasCreatedSecond {
+		t.Fatal("expected second call to report wasCreated = false")
 	}
 	if first.ID != second.ID {
 		t.Fatalf("expected the same chat to be returned, got %s and %s", first.ID, second.ID)
@@ -229,8 +239,8 @@ func TestCreateOrGetDirectChat_ReturnsExistingChat_ReverseOrder(t *testing.T) {
 	svc := NewService(store)
 	ctx := context.Background()
 
-	first, _ := svc.CreateOrGetDirectChat(ctx, "alice", "bob")
-	second, err := svc.CreateOrGetDirectChat(ctx, "bob", "alice")
+	first, _, _ := svc.CreateOrGetDirectChat(ctx, "alice", "bob")
+	second, _, err := svc.CreateOrGetDirectChat(ctx, "bob", "alice")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -244,7 +254,7 @@ func TestCreateOrGetDirectChat_CannotChatWithSelf(t *testing.T) {
 	store.seedUser("alice", "Alice")
 	svc := NewService(store)
 
-	_, err := svc.CreateOrGetDirectChat(context.Background(), "alice", "alice")
+	_, _, err := svc.CreateOrGetDirectChat(context.Background(), "alice", "alice")
 	if !errors.Is(err, ErrCannotChatWithSelf) {
 		t.Fatalf("expected ErrCannotChatWithSelf, got %v", err)
 	}
@@ -255,7 +265,7 @@ func TestCreateOrGetDirectChat_OtherUserNotFound(t *testing.T) {
 	store.seedUser("alice", "Alice")
 	svc := NewService(store)
 
-	_, err := svc.CreateOrGetDirectChat(context.Background(), "alice", "bob")
+	_, _, err := svc.CreateOrGetDirectChat(context.Background(), "alice", "bob")
 	if !errors.Is(err, ErrUserNotFound) {
 		t.Fatalf("expected ErrUserNotFound, got %v", err)
 	}
@@ -278,7 +288,7 @@ func TestCreateOrGetDirectChat_DoesNotCollideWithGroupChatOfSameTwoUsers(t *test
 		t.Fatalf("unexpected error creating group: %v", err)
 	}
 
-	direct, err := svc.CreateOrGetDirectChat(ctx, "alice", "bob")
+	direct, _, err := svc.CreateOrGetDirectChat(ctx, "alice", "bob")
 	if err != nil {
 		t.Fatalf("unexpected error creating direct: %v", err)
 	}
@@ -452,7 +462,7 @@ func TestAddMember_CannotAddToDirectChat(t *testing.T) {
 	svc := NewService(store)
 	ctx := context.Background()
 
-	direct, _ := svc.CreateOrGetDirectChat(ctx, "alice", "bob")
+	direct, _, _ := svc.CreateOrGetDirectChat(ctx, "alice", "bob")
 
 	err := svc.AddMember(ctx, "alice", direct.ID, "carol")
 	if !errors.Is(err, ErrNotGroupChat) {
@@ -558,7 +568,7 @@ func TestLeaveChat_CannotLeaveDirectChat(t *testing.T) {
 	svc := NewService(store)
 	ctx := context.Background()
 
-	direct, _ := svc.CreateOrGetDirectChat(ctx, "alice", "bob")
+	direct, _, _ := svc.CreateOrGetDirectChat(ctx, "alice", "bob")
 
 	err := svc.LeaveChat(ctx, "alice", direct.ID)
 	if !errors.Is(err, ErrNotGroupChat) {

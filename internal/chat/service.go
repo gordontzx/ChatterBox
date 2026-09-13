@@ -15,28 +15,33 @@ func NewService(store Store) *Service {
 	return &Service{store: store}
 }
 
-func (s *Service) CreateOrGetDirectChat(ctx context.Context, callerID, otherUserID string) (*Chat, error) {
+func (s *Service) CreateOrGetDirectChat(ctx context.Context, callerID, otherUserID string) (*Chat, bool, error) {
 	if callerID == otherUserID {
-		return nil, ErrCannotChatWithSelf
+		return nil, false, ErrCannotChatWithSelf
 	}
 
 	exists, err := s.store.UserExists(ctx, otherUserID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if !exists {
-		return nil, ErrUserNotFound
+		return nil, false, ErrUserNotFound
 	}
 
 	existing, err := s.store.FindDirectChat(ctx, callerID, otherUserID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if existing != nil {
-		return existing, nil
+		return existing, false, nil
 	}
 
-	return s.store.CreateDirectChat(ctx, callerID, otherUserID)
+	created, err := s.store.CreateDirectChat(ctx, callerID, otherUserID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return created, true, nil
 }
 
 func (s *Service) ListChats(ctx context.Context, userID string) ([]*Chat, error) {
