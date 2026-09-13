@@ -3,13 +3,17 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Avatar, Button, Spinner } from '../../components/ui'
 import { ConnectionStatus } from '../../components/ConnectionStatus'
 import { useAuth } from '../auth/AuthProvider'
+import { PresenceDot } from '../presence/PresenceDot'
+import { usePresenceStore } from '../presence/presenceStore'
 import { useChatsStore } from './chatStore'
 import { NewChatDialog } from './NewChatDialog'
-import { chatTitle } from './utils'
+import { chatTitle, otherMember } from './utils'
 
 export function ChatsLayout() {
   const { user, logout } = useAuth()
   const { chats, loading, loaded, error, loadChats } = useChatsStore()
+  const presenceByUser = usePresenceStore((s) => s.byUser)
+  const ensurePresenceLoaded = usePresenceStore((s) => s.ensureLoaded)
   const [newChatOpen, setNewChatOpen] = useState(false)
   const location = useLocation()
 
@@ -21,6 +25,25 @@ export function ChatsLayout() {
   useEffect(() => {
     if (!loaded && !loading) void loadChats()
   }, [loaded, loading, loadChats])
+
+  // Seed presence for everyone across every chat, so the online-first sort
+  // below has data to work with (each ensureLoaded call is individually
+  // guarded, so this is cheap once cached).
+  useEffect(() => {
+    for (const chat of chats) {
+      for (const member of chat.members) {
+        if (member.id !== user?.id) void ensurePresenceLoaded(member.id)
+      }
+    }
+  }, [chats, user?.id, ensurePresenceLoaded])
+
+  function isChatOnline(chat: (typeof chats)[number]): boolean {
+    return chat.members.some((m) => m.id !== user?.id && presenceByUser[m.id]?.online)
+  }
+
+  // Stable sort: online chats bubble to the top, otherwise the backend's
+  // existing created_at-desc order is preserved within each group.
+  const sortedChats = [...chats].sort((a, b) => Number(isChatOnline(b)) - Number(isChatOnline(a)))
 
   return (
     <div className="chat-shell" data-mobile-view={mobileView}>
@@ -84,8 +107,9 @@ export function ChatsLayout() {
               No chats yet.
             </p>
           )}
-          {chats.map((chat) => {
+          {sortedChats.map((chat) => {
             const title = user ? chatTitle(chat, user.id) : '?'
+            const other = user && chat.type === 'direct' ? otherMember(chat, user.id) : undefined
             return (
               <NavLink
                 key={chat.id}
@@ -101,7 +125,10 @@ export function ChatsLayout() {
                   background: isActive ? 'var(--color-bg)' : 'transparent',
                 })}
               >
-                <Avatar name={title} size={32} />
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <Avatar name={title} size={32} />
+                  {other && <PresenceDot userId={other.id} />}
+                </div>
                 <span
                   style={{
                     fontSize: 14,

@@ -15,6 +15,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { useMessagesStore } from '../messages/messageStore'
 import { useReadStore } from '../messages/readStore'
 import { useTypingStore } from '../messages/typingStore'
+import { usePresenceStore } from '../presence/presenceStore'
 
 interface RealtimeContextValue {
   status: WsStatus
@@ -73,6 +74,8 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         useTypingStore.getState().markTyping(parsed.chat_id, parsed.user_id)
       } else if (parsed.type === 'read') {
         useReadStore.getState().markRead(parsed.chat_id, parsed.user_id, parsed.up_to_seq)
+      } else if (parsed.type === 'presence') {
+        usePresenceStore.getState().setPresence(parsed.user_id, parsed.online, parsed.last_seen_at)
       }
     })
 
@@ -93,6 +96,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       void useMessagesStore.getState().resync(chatId)
     }
     useReadStore.getState().refreshAll()
+    usePresenceStore.getState().refreshAll()
   }, [wsStatus])
 
   const value = useMemo<RealtimeContextValue>(

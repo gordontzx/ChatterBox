@@ -7,6 +7,7 @@ import { useChatsStore } from '../chats/chatStore'
 import { GroupMembersDialog } from '../chats/GroupMembersDialog'
 import { LeaveChatDialog } from '../chats/LeaveChatDialog'
 import { chatTitle } from '../chats/utils'
+import { PresenceSubtitle } from '../presence/PresenceSubtitle'
 import { useRealtime } from '../realtime/RealtimeProvider'
 import { markAsRead } from './api'
 import { Composer } from './Composer'
@@ -119,6 +120,9 @@ export function ConversationPage() {
               >
                 {chat.members.length} members
               </button>
+            )}
+            {chat?.type === 'direct' && otherMemberIds[0] && (
+              <PresenceSubtitle userId={otherMemberIds[0]} />
             )}
           </div>
         </div>

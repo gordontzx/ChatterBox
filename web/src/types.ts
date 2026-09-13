@@ -76,4 +76,18 @@ export interface IncomingReadEvent {
   up_to_seq: number
 }
 
-export type IncomingEvent = IncomingMessageEvent | IncomingTypingEvent | IncomingReadEvent
+export interface PresenceInfo {
+  user_id: string
+  online: boolean
+  last_seen_at?: string
+}
+
+export interface IncomingPresenceEvent {
+  type: 'presence'
+  user_id: string
+  online: boolean
+  last_seen_at?: string
+}
+
+export type IncomingEvent =
+  IncomingMessageEvent | IncomingTypingEvent | IncomingReadEvent | IncomingPresenceEvent
