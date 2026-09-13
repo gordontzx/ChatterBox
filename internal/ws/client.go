@@ -24,6 +24,8 @@ type Client struct {
 	send   chan []byte
 	hub    *Hub
 	msgSvc *message.Service
+
+	onFullyDisconnected func(userID string)
 }
 
 func NewClient(userID string, conn *websocket.Conn, hub *Hub, msgSvc *message.Service) *Client {
@@ -38,8 +40,11 @@ func NewClient(userID string, conn *websocket.Conn, hub *Hub, msgSvc *message.Se
 
 func (c *Client) ReadPump() {
 	defer func() {
-		c.hub.Unregister(c)
+		isNowFullyOffline := c.hub.Unregister(c)
 		c.conn.Close()
+		if isNowFullyOffline && c.onFullyDisconnected != nil {
+			c.onFullyDisconnected(c.userID)
+		}
 	}()
 
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))

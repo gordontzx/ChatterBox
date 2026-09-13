@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -18,14 +19,21 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-type Handler struct {
-	hub    *Hub
-	secret []byte
-	msgSvc *message.Service
+// presence.service
+type PresenceNotifier interface {
+	UserWentOnline(ctx context.Context, userID string)
+	UserWentOffline(ctx context.Context, userID string)
 }
 
-func NewHandler(hub *Hub, secret []byte, msgSvc *message.Service) *Handler {
-	return &Handler{hub: hub, secret: secret, msgSvc: msgSvc}
+type Handler struct {
+	hub     *Hub
+	secret  []byte
+	msgSvc  *message.Service
+	presence PresenceNotifier
+}
+
+func NewHandler(hub *Hub, secret []byte, msgSvc *message.Service, presence PresenceNotifier) *Handler {
+	return &Handler{hub: hub, secret: secret, msgSvc: msgSvc, presence: presence}
 }
 
 // GET /ws?token=<access_token>
@@ -49,7 +57,17 @@ func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := NewClient(claims.UserID, conn, h.hub, h.msgSvc)
-	h.hub.Register(client)
+
+	if h.presence != nil {
+		client.onFullyDisconnected = func(userID string) {
+			h.presence.UserWentOffline(context.Background(), userID)
+		}
+	}
+
+	isFirstConnection := h.hub.Register(client)
+	if isFirstConnection && h.presence != nil {
+		h.presence.UserWentOnline(context.Background(), claims.UserID)
+	}
 
 	go client.WritePump()
 	go client.ReadPump()

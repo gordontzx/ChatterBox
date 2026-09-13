@@ -15,6 +15,7 @@ import (
 	"ChatterBox/internal/db"
 	"ChatterBox/internal/message"
 	"ChatterBox/internal/middleware"
+	"ChatterBox/internal/presence"
 	"ChatterBox/internal/user"
 	"ChatterBox/internal/ws"
 )
@@ -54,7 +55,11 @@ func main() {
 	userSvc := user.NewService(userStore)
 	userHandler := user.NewHandler(userSvc)
 
-	wsHandler := ws.NewHandler(hub, []byte(cfg.JWTSecret), msgSvc)
+	presenceStore := presence.NewPostgresStore(pool)
+	presenceSvc := presence.NewService(presenceStore, chatSvc, hub)
+	presenceHandler := presence.NewHandler(presenceSvc, hub, chatSvc)
+
+	wsHandler := ws.NewHandler(hub, []byte(cfg.JWTSecret), msgSvc, presenceSvc)
 
 	// Register routes
 	requireAuth := middleware.RequireAuth([]byte(cfg.JWTSecret))
@@ -64,6 +69,8 @@ func main() {
 	mux.HandleFunc("POST /auth/login", authHandler.Login)
 	mux.HandleFunc("POST /auth/refresh", authHandler.Refresh)
 	mux.HandleFunc("POST /auth/logout", authHandler.Logout)
+
+	mux.HandleFunc("GET /ws", wsHandler.ServeWS)
 
 	mux.Handle("POST /chats/direct", requireAuth(http.HandlerFunc(chatHandler.CreateDirect)))
 	mux.Handle("POST /chats/group", requireAuth(http.HandlerFunc(chatHandler.CreateGroup)))
@@ -78,7 +85,7 @@ func main() {
 	mux.Handle("GET /users/me", requireAuth(http.HandlerFunc(userHandler.Me)))
 	mux.Handle("GET /users/search", requireAuth(http.HandlerFunc(userHandler.SearchByEmail)))
 
-	mux.HandleFunc("GET /ws", wsHandler.ServeWS)
+	mux.Handle("GET /users/{userID}/presence", requireAuth(http.HandlerFunc(presenceHandler.GetUserPresence)))
 
 	// Configure HTTP server
 	srv := &http.Server{
