@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act } from 'react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
-import { render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Chat, Message, User } from '../../types'
 import { useChatsStore } from '../chats/chatStore'
 import { ConversationPage } from './ConversationPage'
@@ -54,6 +54,16 @@ function message(chatId: string, id: string, content: string): Message {
 }
 
 describe('ConversationPage', () => {
+  // This project's vitest config doesn't set `test.globals`, so
+  // @testing-library/react's automatic afterEach(cleanup) never registers
+  // — without this, a previous test's tree stays mounted and subscribed to
+  // the (shared, module-level) zustand stores, so a later test seeding
+  // those stores makes the stale tree re-render too, corrupting queries
+  // that expect exactly one match.
+  afterEach(() => {
+    cleanup()
+  })
+
   beforeEach(() => {
     // jsdom doesn't implement scrollIntoView.
     window.HTMLElement.prototype.scrollIntoView = vi.fn()
@@ -100,5 +110,31 @@ describe('ConversationPage', () => {
     }
 
     expect(screen.getAllByTestId('message-list')).toHaveLength(1)
+  })
+
+  it('shows the seen tick on my own message once the other member has read up to its seq', async () => {
+    useReadStore.setState({
+      chats: { 'bob-chat': { receipts: { 'bob-chat-other': 1 }, loaded: true, loading: false } },
+    })
+    const router = createMemoryRouter([{ path: '/chats/:chatId', element: <ConversationPage /> }], {
+      initialEntries: ['/chats/bob-chat'],
+    })
+
+    render(<RouterProvider router={router} />)
+
+    expect(await screen.findByText('✓✓')).toBeTruthy()
+  })
+
+  it('does not show the seen tick when the other member has not caught up yet', async () => {
+    useReadStore.setState({
+      chats: { 'bob-chat': { receipts: { 'bob-chat-other': 0 }, loaded: true, loading: false } },
+    })
+    const router = createMemoryRouter([{ path: '/chats/:chatId', element: <ConversationPage /> }], {
+      initialEntries: ['/chats/bob-chat'],
+    })
+
+    render(<RouterProvider router={router} />)
+
+    expect(screen.queryByText('✓✓')).toBeNull()
   })
 })
