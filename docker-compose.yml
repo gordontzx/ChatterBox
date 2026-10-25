@@ -11,5 +11,53 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chatterbox"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    image: migrate/migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations
+    command: [
+      "-path", "/migrations",
+      "-database", "postgres://chatterbox:supersecretpassword@postgres:5432/chatterbox?sslmode=disable",
+      "up"
+    ]
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://chatterbox:supersecretpassword@postgres:5432/chatterbox?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET}   # pulled from your .env file, not hardcoded
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+    environment:
+      # Server-side proxy target for Vite's dev server (see vite.config.ts) —
+      # reaches the api container by its compose service name. The browser
+      # itself still only ever talks to localhost:5173, same-origin.
+      API_PROXY_TARGET: http://api:8080
+
 volumes:
   pgdata:
