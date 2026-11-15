@@ -1,6 +1,22 @@
 # ChatterBox
 Chatting app.
 
+## Features
+
+- **Accounts** - email/password registration and login, JWT access tokens
+  (15 min) backed by DB-tracked refresh tokens (so a session survives a
+  reload, and logout actually revokes it server-side).
+- **Direct and group chats** - start a 1:1 chat with another user by email,
+  create named group chats, add members, leave a chat.
+- **Real-time messaging** - messages, typing indicators, read receipts, and
+  online presence all pushed live over a WebSocket connection.
+- **Read receipts** - per-message "seen by everyone" tracking in group
+  chats.
+- **Presence** - online/offline status with a "last seen" timestamp,
+  updated live for anyone you share a chat with.
+- **Live chat updates** - being added to a chat, or a group's membership
+  changing, shows up immediately for everyone affected, no refresh needed.
+
 ## Quick start
 
 Prerequisites: Docker and Docker Compose.
@@ -31,7 +47,10 @@ Prerequisites: Docker and Docker Compose.
 - Postgres (e.g. for psql): localhost:5433
 
 If any of these ports are already in use on your machine, that service will
-fail to start — check `docker compose ps`/logs if something looks wrong.
+fail to start - check `docker compose ps`/logs if something looks wrong.
+
+### How to test
+To use multiple accounts, open the frontend website on multiple browsers/incognito windows and login on different accounts.
 
 ### Checking it's up
 
