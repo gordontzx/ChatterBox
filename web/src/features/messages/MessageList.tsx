@@ -1,8 +1,33 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
+import { formatDaySeparator } from '../../lib/time'
 import type { Message } from '../../types'
 import { MessageBubble } from './MessageBubble'
 
 const NEAR_BOTTOM_THRESHOLD_PX = 80
+
+function dayKey(iso: string): string {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+}
+
+function DaySeparator({ iso }: { iso: string }) {
+  return (
+    <div style={{ textAlign: 'center', margin: '12px 0' }}>
+      <span
+        style={{
+          fontSize: 11,
+          color: 'var(--color-text-muted)',
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 999,
+          padding: '2px 10px',
+        }}
+      >
+        {formatDaySeparator(iso)}
+      </span>
+    </div>
+  )
+}
 
 interface MessageListProps {
   messages: Message[]
@@ -72,15 +97,21 @@ export function MessageList({ messages, selfId, senderName, isSeenByAll }: Messa
         onScroll={handleScroll}
         style={{ height: '100%', overflowY: 'auto', padding: 16 }}
       >
-        {messages.map((m) => (
-          <MessageBubble
-            key={m.id}
-            message={m}
-            isOwn={m.sender_id === selfId}
-            senderName={senderName(m.sender_id)}
-            seen={isSeenByAll?.(m.seq)}
-          />
-        ))}
+        {messages.map((m, i) => {
+          const showSeparator =
+            i === 0 || dayKey(m.created_at) !== dayKey(messages[i - 1].created_at)
+          return (
+            <Fragment key={m.id}>
+              {showSeparator && <DaySeparator iso={m.created_at} />}
+              <MessageBubble
+                message={m}
+                isOwn={m.sender_id === selfId}
+                senderName={senderName(m.sender_id)}
+                seen={isSeenByAll?.(m.seq)}
+              />
+            </Fragment>
+          )
+        })}
         <div ref={bottomRef} />
       </div>
       {newBelow && (
