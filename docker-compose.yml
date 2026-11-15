@@ -40,7 +40,7 @@ services:
         condition: service_completed_successfully
     environment:
       DATABASE_URL: postgres://chatterbox:supersecretpassword@postgres:5432/chatterbox?sslmode=disable
-      JWT_SECRET: ${JWT_SECRET}   # pulled from your .env file, not hardcoded
+      JWT_SECRET: ${JWT_SECRET}   # pulled from .env file, not hardcoded
       PORT: "8080"
     ports:
       - "8080:8080"
