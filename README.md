@@ -19,6 +19,10 @@ Chatting app.
 
 ## Quick start
 
+Use a Unix-like environment (Linux, macOS, or WSL on Windows) - the commands
+below rely on `bash`/`sed`/`openssl` and won't run as-is in Command Prompt or
+PowerShell.
+
 Prerequisites: Docker and Docker Compose.
 
 1. Clone the repo and set up your environment file:
@@ -28,7 +32,7 @@ Prerequisites: Docker and Docker Compose.
    cp .env.example .env
    ```
 2. Generate a real `JWT_SECRET` and replace the placeholder line in `.env`
-   with it.
+   with it. Copy and run the entire chain of commands below:
    ```
    JWT_SECRET=$(openssl rand -base64 32) &&
    sed -i.bak "s#^JWT_SECRET=.*#JWT_SECRET=$JWT_SECRET#" .env &&
@@ -39,6 +43,9 @@ Prerequisites: Docker and Docker Compose.
    ```
    docker compose up --build -d
    ```
+   Next time, you can skip the rebuild and just run `docker compose up -d`,
+   only use `--build` again after pulling new commits or changing a
+   Dockerfile.
 
 ### Where to find it
 
